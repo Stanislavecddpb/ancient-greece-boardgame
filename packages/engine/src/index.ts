@@ -6,4 +6,5 @@ export * from './income';
 export * from './auction';
 export * from './actions';
 export * from './metropolis';
+export * from './combat';
 export * from './game';
