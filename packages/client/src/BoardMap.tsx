@@ -76,7 +76,7 @@ function BoardFrame() {
           <g key={deg}>
             <path d={`M${apex.x} ${apex.y} L${b1.x} ${b1.y} L${b2.x} ${b2.y} Z`}
               fill="#f0e2b8" stroke="#7a5e26" strokeWidth="1.5" />
-            <text x={mid.x} y={mid.y + 5} textAnchor="middle" fontSize="15">🌾</text>
+            <circle cx={mid.x} cy={mid.y} r="3" fill="#7a5e26" />
           </g>
         );
       })}
@@ -102,6 +102,12 @@ function SeaCell({ sea, G, selected, color, onSelect }: {
       <circle cx={x} cy={y} r={SEA_R} fill="#13507a" fillOpacity="0.55"
         stroke={selected ? '#ffd76a' : sea.fleets > 0 ? color : '#2f6f9e'}
         strokeWidth={selected ? 4 : 1.5} strokeOpacity={selected ? 1 : 0.6} />
+      {sea.cornucopia > 0 && (
+        <g>
+          <circle cx={x} cy={y} r={SEA_R - 4} fill="none" stroke="#e8c451" strokeWidth="2.5" strokeDasharray="5 4" opacity="0.9" />
+          <text x={x} y={y - SEA_R + 22} textAnchor="middle" fontSize="26">🌾</text>
+        </g>
+      )}
       {sea.fleets > 0 && (
         <g transform={`translate(${x} ${y})`}>
           <motion.g initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1.8, opacity: 1 }}>
@@ -146,7 +152,6 @@ function IslandNode({ isl, G, me, selected, color, onSelect }: {
       </g>
 
       <text className="t-name dark" x={x} y={y - LAND_R - 6}>{isl.name}</text>
-      <text className="t-pros" x={x} y={y - LAND_R + 10}>🌾{isl.prosperity}</text>
 
       {isl.hasMetropolis ? (
         <g transform={`translate(${x} ${y})`}><Metropolis /></g>

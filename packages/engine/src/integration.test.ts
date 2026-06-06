@@ -15,8 +15,9 @@ describe('интеграция фаз через boardgame.io', () => {
     const client = makeClient(2);
     const { G, ctx } = client.getState()!;
     expect(ctx.phase).toBe('auction');
-    // Доход уже начислен: 5 стартовых + 2 prosperity = 7.
-    expect(G.players['0'].gold).toBe(7);
+    // 5 стартовых + доход с рогов (0 или 1 в зависимости от старта флота).
+    expect(G.players['0'].gold).toBeGreaterThanOrEqual(5);
+    expect(G.players['0'].gold).toBeLessThanOrEqual(6);
     expect(G.auction).not.toBeNull();
     expect(G.auction!.toAct).toBe(ctx.currentPlayer);
   });

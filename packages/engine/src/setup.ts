@@ -3,6 +3,7 @@ import {
   type CycladesState,
   type PlayerData,
   type PlayerID,
+  type Sea,
   PLAYER_COLORS,
   STARTING_GOLD,
   UNIT_SUPPLY,
@@ -37,11 +38,15 @@ export function setupGame(ctx: Ctx): CycladesState {
     if (isIsland(home)) {
       home.ownerId = pid;
       home.troops = START_TROOPS;
-      const seaId = home.adjacentSeas[0];
-      const sea = territories[seaId];
-      if (sea && isSea(sea) && sea.fleets === 0) {
-        sea.ownerId = pid;
-        sea.fleets = START_FLEETS;
+      // Флот ставим на свободную соседнюю клетку, предпочитая клетку с рогом
+      // изобилия (чтобы был стартовый доход).
+      const adjacent = home.adjacentSeas
+        .map((id) => territories[id])
+        .filter((t): t is Sea => !!t && isSea(t) && t.fleets === 0);
+      const target = adjacent.find((s) => s.cornucopia > 0) ?? adjacent[0];
+      if (target) {
+        target.ownerId = pid;
+        target.fleets = START_FLEETS;
       }
     }
   });

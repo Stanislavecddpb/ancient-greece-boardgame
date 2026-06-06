@@ -54,8 +54,6 @@ export interface Island {
   cells: Axial[];
   /** Сколько объектов (здания + метрополия) помещается на острове. */
   buildSlots: number;
-  /** Доход золотом владельцу за цикл (рога изобилия). */
-  prosperity: number;
   adjacentSeas: TerritoryId[];
   // --- динамика ---
   /** Кто контролирует остров (его здания и доход). null — ничей. */
@@ -74,6 +72,8 @@ export interface Sea {
   pos: Point;
   /** Осевые координаты клетки в сетке. */
   axial: Axial;
+  /** Рог изобилия: золото в фазе дохода тому, чей флот стоит на клетке. */
+  cornucopia: number;
   adjacentSeas: TerritoryId[];
   adjacentIslands: TerritoryId[];
   // --- динамика ---

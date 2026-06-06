@@ -38,25 +38,27 @@ interface IslandDef {
   name: string;
   cells: [number, number][];
   buildSlots: number;
-  prosperity: number;
 }
 
 // Раскладка на 4 игроков: 4 «домашних» острова по сторонам, Делос в центре,
 // несколько нейтральных. Координаты подобраны на гекс-сетке радиусом 3.
 const ISLAND_DEFS: IslandDef[] = [
-  { id: 'delos', name: 'Делос', cells: [[0, 0]], buildSlots: 4, prosperity: 3 },
+  { id: 'delos', name: 'Делос', cells: [[0, 0]], buildSlots: 4 },
 
-  { id: 'home_n', name: 'Афины', cells: [[0, -3], [1, -3]], buildSlots: 4, prosperity: 2 },
-  { id: 'home_e', name: 'Спарта', cells: [[3, -1], [3, -2]], buildSlots: 4, prosperity: 2 },
-  { id: 'home_s', name: 'Коринф', cells: [[0, 3], [-1, 3]], buildSlots: 4, prosperity: 2 },
-  { id: 'home_w', name: 'Фивы', cells: [[-3, 1], [-3, 2]], buildSlots: 4, prosperity: 2 },
+  { id: 'home_n', name: 'Афины', cells: [[0, -3], [1, -3]], buildSlots: 4 },
+  { id: 'home_e', name: 'Спарта', cells: [[3, -1], [3, -2]], buildSlots: 4 },
+  { id: 'home_s', name: 'Коринф', cells: [[0, 3], [-1, 3]], buildSlots: 4 },
+  { id: 'home_w', name: 'Фивы', cells: [[-3, 1], [-3, 2]], buildSlots: 4 },
 
-  { id: 'naxos', name: 'Наксос', cells: [[-1, -1]], buildSlots: 3, prosperity: 2 },
-  { id: 'paros', name: 'Парос', cells: [[2, 0]], buildSlots: 3, prosperity: 2 },
-  { id: 'milos', name: 'Милос', cells: [[-2, 2]], buildSlots: 3, prosperity: 2 },
-  { id: 'thira', name: 'Тира', cells: [[1, 1]], buildSlots: 3, prosperity: 1 },
-  { id: 'serifos', name: 'Серифос', cells: [[2, -2]], buildSlots: 2, prosperity: 1 },
+  { id: 'naxos', name: 'Наксос', cells: [[-1, -1]], buildSlots: 3 },
+  { id: 'paros', name: 'Парос', cells: [[2, 0]], buildSlots: 3 },
+  { id: 'milos', name: 'Милос', cells: [[-2, 2]], buildSlots: 3 },
+  { id: 'thira', name: 'Тира', cells: [[1, 1]], buildSlots: 3 },
+  { id: 'serifos', name: 'Серифос', cells: [[2, -2]], buildSlots: 2 },
 ];
+
+/** Сколько рогов изобилия выставляется по краю поля. */
+const CORNUCOPIA_COUNT = 6;
 
 /** Домашние острова по количеству игроков. */
 const HOME_ISLANDS: Record<number, TerritoryId[]> = {
@@ -107,7 +109,6 @@ export function createBoard(): Record<TerritoryId, Territory> {
       pos: centroid(cells),
       cells,
       buildSlots: def.buildSlots,
-      prosperity: def.prosperity,
       adjacentSeas: [],
       ownerId: null,
       troops: 0,
@@ -126,12 +127,26 @@ export function createBoard(): Record<TerritoryId, Territory> {
       name: `Море ${cell.q},${cell.r}`,
       pos: axialToPixel(cell),
       axial: cell,
+      cornucopia: 0,
       adjacentSeas: [],
       adjacentIslands: [],
       ownerId: null,
       fleets: 0,
     };
     territories[sea.id] = sea;
+  }
+
+  // Рога изобилия: 6 внешних морских клеток, равномерно по кольцу.
+  const outerSeas = (Object.values(territories).filter(
+    (t) => t.kind === 'sea' && hexDistance(t.axial, { q: 0, r: 0 }) === GRID_RADIUS,
+  ) as Sea[]).sort(
+    (a, b) =>
+      Math.atan2(a.pos.y - BOARD_CENTER.y, a.pos.x - BOARD_CENTER.x) -
+      Math.atan2(b.pos.y - BOARD_CENTER.y, b.pos.x - BOARD_CENTER.x),
+  );
+  for (let i = 0; i < CORNUCOPIA_COUNT && outerSeas.length; i++) {
+    const idx = Math.round((i * outerSeas.length) / CORNUCOPIA_COUNT) % outerSeas.length;
+    outerSeas[idx].cornucopia = 1;
   }
 
   // 5. Смежность: для каждой морской клетки смотрим 6 соседей.

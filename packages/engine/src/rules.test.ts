@@ -48,14 +48,31 @@ describe('setup', () => {
 });
 
 describe('доход', () => {
-  it('начисляет золото по сумме prosperity островов', () => {
+  it('начисляет золото за рога изобилия, занятые флотом', () => {
     const ctx = ctxFor(2);
     const G = setupGame(ctx);
-    const before = G.players['0'].gold;
-    const inc = incomeFor(G, '0'); // только домашний остров (prosperity 2)
-    expect(inc).toBe(2);
+    // Обнуляем все флоты, затем ставим один флот игрока 0 на клетку с рогом.
+    for (const t of Object.values(G.territories)) {
+      if (t.kind === 'sea') { t.fleets = 0; t.ownerId = null; }
+    }
+    const corn = Object.values(G.territories).find((t) => t.kind === 'sea' && t.cornucopia > 0);
+    expect(corn).toBeDefined();
+    if (corn && corn.kind === 'sea') {
+      corn.ownerId = '0';
+      corn.fleets = 1;
+      expect(incomeFor(G, '0')).toBe(1);
+    }
+    // Игрок 1 без флота на рогах — без дохода.
+    const before1 = G.players['1'].gold;
     applyIncome(G);
-    expect(G.players['0'].gold).toBe(before + 2);
+    expect(G.players['1'].gold).toBe(before1);
+    expect(G.players['0'].gold).toBe(5 + 1);
+  });
+
+  it('всего на доске 6 рогов изобилия', () => {
+    const G = setupGame(ctxFor(2));
+    const total = Object.values(G.territories).filter((t) => t.kind === 'sea' && t.cornucopia > 0).length;
+    expect(total).toBe(6);
   });
 });
 
