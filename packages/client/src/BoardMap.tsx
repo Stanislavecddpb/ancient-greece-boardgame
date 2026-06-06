@@ -22,7 +22,11 @@ interface Props {
 }
 
 const SEA_R = CELL_D * 0.46;
-const LAND_R = CELL_D * 0.56;
+const LAND_R = CELL_D * 0.5;
+
+// Игровые фишки (войска/флот/здания) на карте пока скрыты — включим на этапе
+// движения и боя. Сейчас доска показывает только землю, воду и рога изобилия.
+const SHOW_PIECES = false;
 
 export function BoardMap({ G, me, selected, onSelect }: Props) {
   const territories = Object.values(G.territories);
@@ -73,16 +77,15 @@ function SeaCell({ sea, G, selected, color, onSelect }: {
   const { x, y } = sea.pos;
   return (
     <g style={{ cursor: 'pointer' }} onClick={() => onSelect(sea.id)}>
-      <circle cx={x} cy={y} r={SEA_R} fill="#13507a" fillOpacity="0.5"
-        stroke={selected ? '#ffd76a' : sea.fleets > 0 ? color : '#2f6f9e'}
-        strokeWidth={selected ? 4 : 1.4} strokeOpacity={selected ? 1 : 0.55} />
+      <circle cx={x} cy={y} r={SEA_R} fill="#13507a" fillOpacity="0.45"
+        stroke={selected ? '#ffd76a' : '#2f6f9e'}
+        strokeWidth={selected ? 4 : 1.4} strokeOpacity={selected ? 1 : 0.5} />
       {sea.cornucopia > 0 && (
         <g transform={`translate(${x} ${y})`}>
-          <circle r={SEA_R - 5} fill="none" stroke="#e8c451" strokeWidth="2" strokeDasharray="5 4" opacity="0.85" />
           <CoinStack count={sea.cornucopia} />
         </g>
       )}
-      {sea.fleets > 0 && (
+      {SHOW_PIECES && sea.fleets > 0 && (
         <g transform={`translate(${x} ${y - 2})`}>
           <motion.g initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1.5, opacity: 1 }}>
             <Trireme color={G.players[sea.ownerId!].color} />
@@ -97,8 +100,8 @@ function SeaCell({ sea, G, selected, color, onSelect }: {
 function IslandNode({ isl, G, me, selected, color, onSelect }: {
   isl: Island; G: CycladesState; me: string | null; selected: boolean; color: string; onSelect: (id: TerritoryId) => void;
 }) {
+  void me;
   const pts = isl.cells.map((c) => c.pos);
-  const { x, y } = isl.pos;
   const owned = isl.ownerId != null;
 
   return (
@@ -107,40 +110,45 @@ function IslandNode({ isl, G, me, selected, color, onSelect }: {
       {(selected || owned) && (
         <g filter="url(#goo)">
           {pts.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={LAND_R + 5} fill={selected ? '#ffd76a' : color} opacity={selected ? 0.9 : 0.8} />
+            <circle key={i} cx={p.x} cy={p.y} r={LAND_R + 4} fill={selected ? '#ffd76a' : color} opacity={selected ? 0.85 : 0.7} />
           ))}
         </g>
       )}
-      <g filter="url(#goo)">
-        {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={LAND_R} fill="url(#sandGrad)" />)}
-      </g>
-      <g filter="url(#goo)" opacity="0.5">
-        {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={LAND_R} fill="none" stroke="#8a6a30" strokeWidth="3" />)}
+
+      {/* Массив суши с неровной береговой линией и рельефом. */}
+      <g filter="url(#coast)">
+        <g filter="url(#goo)">
+          {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={LAND_R} fill="url(#beachGrad)" />)}
+        </g>
+        <g filter="url(#goo)">
+          {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={LAND_R - 7} fill="url(#grassGrad)" />)}
+        </g>
+        {/* горный рельеф */}
+        {pts.map((p, i) => (
+          <ellipse key={`m${i}`} cx={p.x - 5} cy={p.y - 6} rx={LAND_R * 0.34} ry={LAND_R * 0.26}
+            fill="#6f5d39" opacity="0.75" />
+        ))}
       </g>
 
-      <text className="t-name dark" x={x} y={y - LAND_R - 4}>{isl.name}</text>
+      {/* рога изобилия на суше — снизу слева клетки */}
+      {isl.cornucopiaSpots.map((s, i) => (
+        <g key={i} transform={`translate(${s.pos.x - LAND_R * 0.5} ${s.pos.y + LAND_R * 0.45})`}>
+          <CoinStack count={s.count} />
+        </g>
+      ))}
 
-      {isl.hasMetropolis ? (
-        <g transform={`translate(${x} ${y})`}><Metropolis /></g>
+      {SHOW_PIECES && (isl.hasMetropolis ? (
+        <g transform={`translate(${isl.pos.x} ${isl.pos.y})`}><Metropolis /></g>
       ) : (
         isl.buildings.map((b, i) => {
           const n = isl.buildings.length;
-          const bx = x + (i - (n - 1) / 2) * 24;
-          return <g key={i} transform={`translate(${bx} ${y - 2}) scale(1.3)`}><BuildingGlyph type={b.type} /></g>;
+          const bx = isl.pos.x + (i - (n - 1) / 2) * 24;
+          return <g key={i} transform={`translate(${bx} ${isl.pos.y - 2}) scale(1.3)`}><BuildingGlyph type={b.type} /></g>;
         })
-      )}
+      ))}
 
-      {/* рога изобилия на суше — у края клетки */}
-      {isl.cornucopiaSpots.map((s, i) => {
-        const dx = s.pos.x - x, dy = s.pos.y - y;
-        const len = Math.hypot(dx, dy) || 1;
-        const ox = s.pos.x + (dx / len) * (LAND_R * 0.4);
-        const oy = s.pos.y + (dy / len) * (LAND_R * 0.4) + (len < 1 ? LAND_R * 0.4 : 0);
-        return <g key={i} transform={`translate(${ox} ${oy})`}><CoinStack count={s.count} /></g>;
-      })}
-
-      {isl.troops > 0 && (
-        <g transform={`translate(${x} ${y + LAND_R - 4})`}>
+      {SHOW_PIECES && isl.troops > 0 && (
+        <g transform={`translate(${isl.pos.x} ${isl.pos.y + LAND_R - 4})`}>
           <motion.g initial={{ scale: 0.7 }} animate={{ scale: 1.6 }}>
             <Hoplite color={G.players[isl.ownerId!].color} />
             {isl.troops > 1 && <Badge x={12} y={-10} text={isl.troops} />}

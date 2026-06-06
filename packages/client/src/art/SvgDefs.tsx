@@ -57,6 +57,24 @@ export function SvgDefs() {
         <stop offset="70%" stopColor="#0f3f63" />
         <stop offset="100%" stopColor="#08263d" />
       </radialGradient>
+
+      {/* Неровная береговая линия: шум + смещение краёв острова. */}
+      <filter id="coast" x="-35%" y="-35%" width="170%" height="170%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045 0.05" numOctaves="2" seed="5" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="20" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      {/* Зелень острова (трава → склон). */}
+      <radialGradient id="grassGrad" cx="42%" cy="36%" r="75%">
+        <stop offset="0%" stopColor="#86a85a" />
+        <stop offset="55%" stopColor="#5f8540" />
+        <stop offset="100%" stopColor="#456330" />
+      </radialGradient>
+      {/* Песчаный берег. */}
+      <radialGradient id="beachGrad" cx="45%" cy="40%" r="75%">
+        <stop offset="0%" stopColor="#ecd9a8" />
+        <stop offset="100%" stopColor="#d8bd84" />
+      </radialGradient>
     </defs>
   );
 }

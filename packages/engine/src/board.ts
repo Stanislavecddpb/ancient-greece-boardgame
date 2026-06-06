@@ -36,7 +36,7 @@ const ISLAND_DEFS: IslandDef[] = [
   { id: 'home_n', name: 'Афины', cells: [[2, 1], [2, 2], [3, 1], [3, 2]], buildSlots: 4 },
   { id: 'home_e', name: 'Спарта', cells: [[3, 5], [3, 6]], buildSlots: 3 },
   { id: 'home_w', name: 'Коринф', cells: [[7, 1], [8, 1], [8, 2]], buildSlots: 4 },
-  { id: 'home_s', name: 'Фивы', cells: [[8, 7], [9, 6], [10, 5]], buildSlots: 4 },
+  { id: 'home_s', name: 'Фивы', cells: [[7, 8], [8, 7], [9, 6], [10, 5]], buildSlots: 4 },
 
   { id: 'delos', name: 'Делос', cells: [[4, 4], [5, 5]], buildSlots: 3 },
   { id: 'naxos', name: 'Наксос', cells: [[6, 4], [7, 4]], buildSlots: 3 },
