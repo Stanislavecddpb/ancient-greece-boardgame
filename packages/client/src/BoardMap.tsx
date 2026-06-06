@@ -49,11 +49,11 @@ export function BoardMap({ G, me, selected, onSelect }: Props) {
   );
 }
 
-/** Круглое поле с бронзовой рамкой-меандром и стрелками по сторонам. */
+/** Круглое поле с бронзовой рамкой-меандром и 6 рогами изобилия по краю. */
 function BoardFrame() {
   const c = BOARD_CENTER.x;
-  const meander = 2 * Math.PI * BOARD_R;
-  const arrows = [0, 90, 180, 270];
+  // 6 рогов изобилия равномерно по кольцу (как на оригинальной доске).
+  const cornucopias = [-90, -30, 30, 90, 150, 210];
   return (
     <g>
       <circle cx={c} cy={c} r={BOARD_R + 14} fill="#caa24f" />
@@ -63,13 +63,20 @@ function BoardFrame() {
         strokeDasharray="10 6" />
       <circle cx={c} cy={c} r={BOARD_R} fill="url(#boardGlow)" stroke="#3a2c12" strokeWidth="3" />
       <circle cx={c} cy={c} r={BOARD_R} fill="none" filter="url(#waterTex)" opacity="0.4" />
-      {arrows.map((deg) => {
+      {cornucopias.map((deg) => {
         const rad = (deg * Math.PI) / 180;
-        const ax = c + Math.cos(rad) * (BOARD_R + 7);
-        const ay = c + Math.sin(rad) * (BOARD_R + 7);
+        const ux = Math.cos(rad), uy = Math.sin(rad); // наружу
+        const tx = -uy, ty = ux; // по касательной
+        // апекс ближе к центру, основание — наружу
+        const apex = { x: c + ux * (BOARD_R - 14), y: c + uy * (BOARD_R - 14) };
+        const b1 = { x: c + ux * (BOARD_R + 12) + tx * 15, y: c + uy * (BOARD_R + 12) + ty * 15 };
+        const b2 = { x: c + ux * (BOARD_R + 12) - tx * 15, y: c + uy * (BOARD_R + 12) - ty * 15 };
+        const mid = { x: c + ux * (BOARD_R + 1), y: c + uy * (BOARD_R + 1) };
         return (
-          <g key={deg} transform={`translate(${ax} ${ay}) rotate(${deg + 90})`}>
-            <path d="M0 -9 L8 7 L-8 7 Z" fill="#f0e2b8" stroke="#7a5e26" strokeWidth="1" />
+          <g key={deg}>
+            <path d={`M${apex.x} ${apex.y} L${b1.x} ${b1.y} L${b2.x} ${b2.y} Z`}
+              fill="#f0e2b8" stroke="#7a5e26" strokeWidth="1.5" />
+            <text x={mid.x} y={mid.y + 5} textAnchor="middle" fontSize="15">🌾</text>
           </g>
         );
       })}
