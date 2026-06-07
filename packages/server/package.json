@@ -4,15 +4,17 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@cyclades/engine": "*",
-    "boardgame.io": "^0.50.2"
+    "boardgame.io": "^0.50.2",
+    "koa-static": "^5.0.0"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/koa-static": "^4.0.4"
   }
 }

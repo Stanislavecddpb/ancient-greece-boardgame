@@ -4,9 +4,13 @@ import { LobbyClient } from 'boardgame.io/client';
 import { CycladesGame, GAME_ID } from '@cyclades/engine';
 import { NetBoard as Board } from './Board';
 
-// Сервер по умолчанию — тот же хост, что отдал клиент, порт 3001.
-// Это позволяет друзьям в одной сети подключаться по локальному IP без правок.
-export const SERVER = import.meta.env.VITE_SERVER ?? `http://${location.hostname}:3001`;
+// Адрес сервера:
+//  • dev (Vite на 5173) — тот же хост, порт 3001;
+//  • prod (клиент раздаётся самим сервером на одном порту/за туннелем) — тот же origin.
+// Переопределяется через VITE_SERVER при сборке.
+export const SERVER =
+  import.meta.env.VITE_SERVER ??
+  (import.meta.env.DEV ? `http://${location.hostname}:3001` : location.origin);
 
 export const lobby = new LobbyClient({ server: SERVER });
 
