@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import type { BoardProps } from 'boardgame.io/react';
 import {
   type CycladesState,
@@ -40,23 +41,54 @@ function creatureTargetOk(def: CreatureDef, sel: Territory | null, pid: string):
 
 /** Сетевой режим: «я» — закреплённый за клиентом игрок. */
 export function NetBoard(p: BoardProps<CycladesState>) {
-  return <GameView G={p.G} ctx={p.ctx} moves={p.moves} me={p.playerID} />;
+  return <GameView G={p.G} ctx={p.ctx} moves={p.moves} me={p.playerID}
+    matchData={p.matchData} matchID={p.matchID} />;
 }
 
 /** Хотсит: «я» — текущий активный игрок (ходим за всех по очереди). */
 export function HotseatBoard(p: BoardProps<CycladesState>) {
-  return <GameView G={p.G} ctx={p.ctx} moves={p.moves} me={p.ctx.currentPlayer} />;
+  return <GameView G={p.G} ctx={p.ctx} moves={p.moves} me={p.ctx.currentPlayer} matchID={p.matchID} />;
 }
 
-function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: any; me: string | null }) {
+interface MatchPlayer { id: number; name?: string; isConnected?: boolean }
+
+function GameView({ G, ctx, moves, me, matchData, matchID }: {
+  G: CycladesState; ctx: any; moves: any; me: string | null;
+  matchData?: MatchPlayer[]; matchID?: string;
+}) {
   const [selected, setSelected] = useState<TerritoryId | null>(null);
   const [troopCount, setTroopCount] = useState(1);
   const [fleetTake, setFleetTake] = useState(99);
+  const [intro, setIntro] = useState(false);
+
+  // Имя игрока: введённое при входе (matchData) → иначе из состояния.
+  const nameOf = (pid: string | null): string => {
+    if (pid == null) return '';
+    const m = matchData?.find((x) => String(x.id) === pid);
+    return m?.name || G.players[pid]?.name || `Игрок ${Number(pid) + 1}`;
+  };
+
+  // Заставка (занавес + очерёдность) — один раз на старте партии.
+  useEffect(() => {
+    if (!G.started || ctx.phase !== 'auction' || G.cycle !== 1) return;
+    const key = `cyclades:intro:${matchID ?? 'local'}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    setIntro(true);
+  }, [G.started, ctx.phase, G.cycle, matchID]);
 
   if (ctx.gameover) {
     const w = G.players[ctx.gameover.winner];
-    return <div className="gameover"><h1>🏆 Победа: {w?.name}!</h1></div>;
+    return <div className="gameover"><h1>🏆 Победа: {nameOf(ctx.gameover.winner) || w?.name}!</h1></div>;
   }
+
+  // Лобби: ждём игроков и старт хоста.
+  if (ctx.phase === 'lobby') {
+    return <Lobby G={G} ctx={ctx} me={me} moves={moves} matchData={matchData} nameOf={nameOf} />;
+  }
+
+  const order: string[] = Array.from({ length: ctx.numPlayers }, (_, i) =>
+    ctx.playOrder[(G.startIndex + i) % ctx.playOrder.length]);
 
   const activeId = G.pendingCornucopia ?? (G.auction ? G.auction.toAct : activePlayerId(G));
 
@@ -83,9 +115,10 @@ function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: an
       <div className="map-area">
         <div className="board-stage">
           <BoardMap G={G} me={me} selected={selected} onSelect={setSelected} movement={movement} />
-          <PlayersCorners G={G} ctx={ctx} activeId={activeId} me={me} />
+          <PlayersCorners G={G} ctx={ctx} activeId={activeId} me={me} nameOf={nameOf} />
         </div>
         <div className="phase-tag">Цикл {G.cycle} · {phaseLabel(ctx.phase)}</div>
+        {intro && <GameIntro G={G} order={order} nameOf={nameOf} onDone={() => setIntro(false)} />}
         {G.combat ? (
           <CombatPanel G={G} me={me} moves={moves} />
         ) : G.fleetMove && G.fleetMove.playerId === me ? (
@@ -94,7 +127,7 @@ function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: an
           G.pendingCornucopia === me ? (
             <ProsperityPrompt G={G} me={me} moves={moves} selected={selected} />
           ) : (
-            <div className="action-bar"><div className="ab-title">☀️ {G.players[G.pendingCornucopia].name} кладёт рог изобилия…</div></div>
+            <div className="action-bar"><div className="ab-title">☀️ {nameOf(G.pendingCornucopia)} кладёт рог изобилия…</div></div>
           )
         ) : ctx.phase === 'actions' ? (
           <ActionBar G={G} me={me} moves={moves} selected={selected}
@@ -102,7 +135,7 @@ function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: an
         ) : null}
         <EventLog G={G} />
       </div>
-      <GodBoard G={G} ctx={ctx} me={me} moves={moves} />
+      <GodBoard G={G} ctx={ctx} me={me} moves={moves} nameOf={nameOf} />
     </div>
   );
 }
@@ -115,8 +148,8 @@ function phaseLabel(phase: string | null): string {
 
 const CORNERS = ['tl', 'tr', 'bl', 'br'];
 
-function PlayersCorners({ G, ctx, activeId, me }: {
-  G: CycladesState; ctx: any; activeId: string | null; me: string | null;
+function PlayersCorners({ G, ctx, activeId, me, nameOf }: {
+  G: CycladesState; ctx: any; activeId: string | null; me: string | null; nameOf: (pid: string) => string;
 }) {
   return (
     <>
@@ -125,7 +158,7 @@ function PlayersCorners({ G, ctx, activeId, me }: {
         return (
           <div key={pid} className={`player-corner ${CORNERS[i] ?? 'tl'} ${pid === activeId ? 'active' : ''}`}
             style={{ ['--pc' as any]: p.color }}>
-            <div className="pc-name"><span className="pc-dot" style={{ background: p.color }} />{p.name}{pid === me ? ' (вы)' : ''}</div>
+            <div className="pc-name"><span className="pc-dot" style={{ background: p.color }} />{nameOf(pid)}{pid === me ? ' (вы)' : ''}</div>
             <div className="pc-stats">
               {/* Чужие золото/жрецы/философы скрыты. */}
               <span title="золото">🪙{pid === me ? p.gold : '?'}</span>
@@ -198,6 +231,86 @@ function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove 
           <button className="end-turn" onClick={() => moves.endGod()}>Завершить →</button>
         </div>
       )}
+    </div>
+  );
+}
+
+function Lobby({ G, ctx, me, moves, matchData, nameOf }: {
+  G: CycladesState; ctx: any; me: string | null; moves: any;
+  matchData?: MatchPlayer[]; nameOf: (pid: string) => string;
+}) {
+  const total = ctx.numPlayers;
+  const filled = matchData ? matchData.filter((m) => m.name).length : total;
+  const full = filled >= total;
+  const isHost = me === '0';
+  void nameOf;
+  return (
+    <div className="lobby">
+      <div className="lobby-card">
+        <h1>Cyclades</h1>
+        <p className="hint">Когда все сядут за стол, хост начинает игру.</p>
+        <div className="lobby-seats">
+          {Array.from({ length: total }, (_, i) => {
+            const pid = String(i);
+            // В сети — имя из matchData (или «ожидание»); в хотсите — имя из состояния.
+            const nm = matchData ? matchData.find((m) => m.id === i)?.name : G.players[pid].name;
+            return (
+              <div key={i} className={`lobby-seat ${nm ? 'taken' : ''}`} style={{ ['--pc' as any]: G.players[pid].color }}>
+                <span className="ls-num">{i + 1}</span>
+                <span className="ls-dot" style={{ background: G.players[pid].color }} />
+                {nm ? <b>{nm}</b> : <i>ожидание…</i>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="lobby-status">{filled}/{total} игроков за столом</div>
+        {isHost ? (
+          <button className="lobby-start" disabled={!full} onClick={() => moves.startGame()}>
+            {full ? '▶ Начать игру' : 'Ждём игроков…'}
+          </button>
+        ) : (
+          <div className="hint">Ждём, пока хост начнёт игру…</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Заставка старта: занавес открывается, затем проявляется очерёдность хода. */
+function GameIntro({ G, order, nameOf, onDone }: {
+  G: CycladesState; order: string[]; nameOf: (pid: string) => string; onDone: () => void;
+}) {
+  useEffect(() => {
+    const t = setTimeout(onDone, (3 + order.length * 0.5 + 7) * 1000);
+    return () => clearTimeout(t);
+  }, [onDone, order.length]);
+
+  return (
+    <div className="intro">
+      <motion.div className="curtain left" initial={{ x: 0 }} animate={{ x: '-105%' }}
+        transition={{ duration: 1.1, delay: 0.4, ease: 'easeInOut' }} />
+      <motion.div className="curtain right" initial={{ x: 0 }} animate={{ x: '105%' }}
+        transition={{ duration: 1.1, delay: 0.4, ease: 'easeInOut' }} />
+      <motion.div className="intro-content" initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 1.3, duration: 0.5 }}>
+        <h2>Очерёдность хода</h2>
+        <ol className="intro-order">
+          {order.map((pid, i) => (
+            <motion.li key={pid} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1.6 + i * 0.5, type: 'spring', stiffness: 200, damping: 18 }}
+              style={{ ['--pc' as any]: G.players[pid].color }}>
+              <span className="io-num">{i + 1}</span>
+              <span className="io-dot" style={{ background: G.players[pid].color }} />
+              <span className="io-name">{nameOf(pid)}</span>
+              {i === 0 && <span className="io-first">ходит первым</span>}
+            </motion.li>
+          ))}
+        </ol>
+        <motion.button className="intro-go" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          transition={{ delay: 1.9 + order.length * 0.5 }} onClick={onDone}>
+          В бой! ⚔️
+        </motion.button>
+      </motion.div>
     </div>
   );
 }

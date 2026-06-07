@@ -47,9 +47,11 @@ interface Props {
   ctx: { phase: string | null; currentPlayer: string; numPlayers: number; playOrder: string[] };
   me: string | null;
   moves: any;
+  nameOf?: (pid: string) => string;
 }
 
-export function GodBoard({ G, ctx, me, moves }: Props) {
+export function GodBoard({ G, ctx, me, moves, nameOf }: Props) {
+  const name = nameOf ?? ((pid: string) => G.players[pid]?.name ?? pid);
   const auction = G.auction;
   const phase = ctx.phase;
   const cycleGods: GodName[] = auction
@@ -61,21 +63,21 @@ export function GodBoard({ G, ctx, me, moves }: Props) {
   return (
     <div className="godboard">
       <div className="gb-top">
-        <TurnOrder G={G} ctx={ctx} />
+        <TurnOrder G={G} ctx={ctx} name={name} />
         <Creatures G={G} me={me} />
       </div>
 
       <div className="gb-gods">
         {cycleGods.map((god) => (
-          <GodSlot key={god} god={god} G={G} phase={phase} me={me} moves={moves} />
+          <GodSlot key={god} god={god} G={G} phase={phase} me={me} moves={moves} name={name} />
         ))}
-        <GodSlot god="apollo" G={G} phase={phase} me={me} moves={moves} />
+        <GodSlot god="apollo" G={G} phase={phase} me={me} moves={moves} name={name} />
       </div>
     </div>
   );
 }
 
-function TurnOrder({ G, ctx }: { G: CycladesState; ctx: Props['ctx'] }) {
+function TurnOrder({ G, ctx, name }: { G: CycladesState; ctx: Props['ctx']; name: (pid: string) => string }) {
   const n = ctx.numPlayers;
   const order = Array.from({ length: n }, (_, i) => ctx.playOrder[(G.startIndex + i) % ctx.playOrder.length]);
   const activeId = G.auction ? G.auction.toAct : null;
@@ -88,7 +90,7 @@ function TurnOrder({ G, ctx }: { G: CycladesState; ctx: Props['ctx'] }) {
           <div key={i} className={`to-row ${p && p.id === activeId ? 'active' : ''}`}>
             <span className="to-num">{i + 1}</span>
             {p && <span className="to-tok" style={{ background: p.color }} />}
-            {p && <span className="to-name">{p.name}</span>}
+            {p && <span className="to-name">{name(pid)}</span>}
           </div>
         );
       })}
@@ -124,8 +126,8 @@ function Creatures({ G, me }: { G: CycladesState; me: string | null }) {
   );
 }
 
-function GodSlot({ god, G, phase, me, moves }: {
-  god: GodName; G: CycladesState; phase: string | null; me: string | null; moves: any;
+function GodSlot({ god, G, phase, me, moves, name }: {
+  god: GodName; G: CycladesState; phase: string | null; me: string | null; moves: any; name: (pid: string) => string;
 }) {
   const d = GOD_DATA[god];
   const [imgOk, setImgOk] = useState(true);
@@ -166,7 +168,7 @@ function GodSlot({ god, G, phase, me, moves }: {
         </div>
       )}
       {occupant && phase === 'auction' && (
-        <div className="gs-occ" style={{ color: occupant.color }}>● {occupant.name}: {slot!.bid}🪙</div>
+        <div className="gs-occ" style={{ color: occupant.color }}>● {name(occupant.id)}: {slot!.bid}🪙</div>
       )}
     </div>
   );

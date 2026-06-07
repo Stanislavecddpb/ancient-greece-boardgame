@@ -22,7 +22,7 @@ import {
   advanceTurn,
   endCycle,
 } from './actions';
-import { metropolisCount, islandsOf } from './helpers';
+import { metropolisCount, islandsOf, log } from './helpers';
 import { applyBuyCreature, applyCycleCreatures } from './creatures';
 import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat } from './movement';
 import { dieFromRandom } from './combat';
@@ -43,10 +43,25 @@ export const CycladesGame: Game<CycladesState> = {
   setup: ({ ctx, random }) => setupGame(ctx, random),
 
   phases: {
+    // 0. Лобби: ждём, пока хост нажмёт «Начать игру» (когда все за столом).
+    // Здесь же случайно определяется очерёдность первого аукциона.
+    lobby: {
+      start: true,
+      next: 'auction',
+      endIf: ({ G }) => G.started,
+      moves: {
+        startGame: ({ G, ctx, random, playerID }) => {
+          if (playerID !== '0' || G.started) return INVALID_MOVE;
+          G.started = true;
+          G.startIndex = random.Die(ctx.numPlayers) - 1; // случайный первый игрок
+          log(G, 'Игра началась. Очерёдность хода определена.');
+        },
+      },
+    },
+
     // 1. Аукцион богов. Каждый цикл начинается с начисления дохода, затем игроки
     // по очереди делают подношения богам.
     auction: {
-      start: true,
       next: 'actions',
       onBegin: ({ G, ctx }) => {
         applyIncome(G);

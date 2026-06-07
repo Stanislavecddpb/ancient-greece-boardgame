@@ -217,6 +217,8 @@ export interface CycladesState {
   startIndex: number;
   /** Активно во время фазы аукциона. */
   auction: AuctionState | null;
+  /** Игра началась (хост нажал «Начать»), очерёдность определена. */
+  started: boolean;
   /** Активно во время фазы действий. */
   actions: ActionsState | null;
   /** Рынок мифических существ (общий, открытый). */

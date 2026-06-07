@@ -48,7 +48,6 @@ export function GameRoom({ matchID }: { matchID: string }) {
   const shareUrl = `${location.origin}${location.pathname}#/m/${matchID}`;
   const joined = players?.filter((p) => p.name).length ?? 0;
   const total = players?.length ?? 0;
-  const full = total > 0 && joined === total;
 
   function copyLink() {
     navigator.clipboard?.writeText(shareUrl).then(() => {
@@ -67,9 +66,6 @@ export function GameRoom({ matchID }: { matchID: string }) {
           <button onClick={copyLink}>{copied ? 'Скопировано!' : 'Скопировать ссылку'}</button>
           <span className="joined">Игроки: {joined}/{total}</span>
         </div>
-        {!full && (
-          <div className="waiting">Ожидаем игроков… поделитесь ссылкой с друзьями.</div>
-        )}
         <NetClient matchID={matchID} playerID={seat.playerID} credentials={seat.credentials} />
       </div>
     );

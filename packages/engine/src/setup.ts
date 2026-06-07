@@ -71,6 +71,7 @@ export function setupGame(ctx: Ctx, random?: RandomAPI): CycladesState {
     territories,
     cycle: 1,
     startIndex: 0,
+    started: false,
     auction: null,
     actions: null,
     creatures: createCreatureMarket(random?.Shuffle),
