@@ -206,17 +206,15 @@ export function applyBuyCreature(
   return null;
 }
 
-/** Зевс: за 1 золото сбросить весь открытый рынок и открыть новый. */
+/** Зевс: бесплатно сбросить весь открытый рынок и открыть новый (один раз за ход). */
 export function applyCycleCreatures(G: CycladesState, pid: PlayerID): string | null {
   const s = G.actions;
   if (!s) return 'нет фазы действий';
   if (s.creatureCycled) return 'колода уже прокручена в этот ход';
-  if (G.players[pid].gold < 1) return 'не хватает золота';
 
-  G.players[pid].gold -= 1;
   s.creatureCycled = true;
   while (G.creatures.market.length) G.creatures.discard.push(G.creatures.market.pop()!);
   refillMarket(G.creatures);
-  log(G, `${G.players[pid].name} прокручивает колоду существ (−1🪙).`);
+  log(G, `${G.players[pid].name} прокручивает колоду существ.`);
   return null;
 }

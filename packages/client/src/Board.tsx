@@ -189,9 +189,9 @@ function CreatureButtons({ G, pid, moves, sel, selected, god, s }: {
         );
       })}
       {god === 'zeus' && (
-        <button className="cr-cycle" disabled={!!s.creatureCycled || gold < 1}
-          onClick={() => moves.cycleCreatures()} title="сбросить рынок и открыть новый">
-          🔄 прокрутить (1🪙)
+        <button className="cr-cycle" disabled={!!s.creatureCycled}
+          onClick={() => moves.cycleCreatures()} title="бесплатно сбросить рынок и открыть новый (1 раз за ход)">
+          🔄 прокрутить
         </button>
       )}
     </span>

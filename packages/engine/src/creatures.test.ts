@@ -106,12 +106,12 @@ describe('покупка существ', () => {
 });
 
 describe('прокрутка колоды Зевсом', () => {
-  it('меняет рынок за 1 золото, один раз за ход', () => {
+  it('бесплатно меняет рынок, один раз за ход', () => {
     const G = withMarket(['minotaur', 'pegasus', 'cyclops']);
     const before = [...G.creatures.market];
     const gold0 = G.players['0'].gold;
     expect(applyCycleCreatures(G, '0')).toBeNull();
-    expect(G.players['0'].gold).toBe(gold0 - 1);
+    expect(G.players['0'].gold).toBe(gold0); // бесплатно
     expect(G.creatures.market).not.toEqual(before);
     expect(G.creatures.discard).toEqual(expect.arrayContaining(before));
     expect(applyCycleCreatures(G, '0')).toBe('колода уже прокручена в этот ход');
