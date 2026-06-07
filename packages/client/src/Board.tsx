@@ -24,7 +24,17 @@ const GOD_EMOJI: Record<GodName, string> = {
   ares: '🗡️', poseidon: '🌊', zeus: '⚡', athena: '🦉', apollo: '☀️',
 };
 
-export function Board({ G, ctx, moves, playerID }: BoardProps<CycladesState>) {
+/** Сетевой режим: «я» — закреплённый за клиентом игрок. */
+export function NetBoard(p: BoardProps<CycladesState>) {
+  return <GameView G={p.G} ctx={p.ctx} moves={p.moves} me={p.playerID} />;
+}
+
+/** Хотсит: «я» — текущий активный игрок (ходим за всех по очереди). */
+export function HotseatBoard(p: BoardProps<CycladesState>) {
+  return <GameView G={p.G} ctx={p.ctx} moves={p.moves} me={p.ctx.currentPlayer} />;
+}
+
+function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: any; me: string | null }) {
   const [selected, setSelected] = useState<TerritoryId | null>(null);
 
   if (ctx.gameover) {
@@ -37,15 +47,15 @@ export function Board({ G, ctx, moves, playerID }: BoardProps<CycladesState>) {
   return (
     <div className="game">
       <div className="map-area">
-        <BoardMap G={G} me={playerID} selected={selected} onSelect={setSelected} />
-        <PlayersCorners G={G} ctx={ctx} activeId={activeId} me={playerID} />
+        <BoardMap G={G} me={me} selected={selected} onSelect={setSelected} />
+        <PlayersCorners G={G} ctx={ctx} activeId={activeId} me={me} />
         <div className="phase-tag">Цикл {G.cycle} · {phaseLabel(ctx.phase)}</div>
         {ctx.phase === 'actions' && (
-          <ActionBar G={G} me={playerID} moves={moves} selected={selected} />
+          <ActionBar G={G} me={me} moves={moves} selected={selected} />
         )}
         <EventLog G={G} />
       </div>
-      <GodBoard G={G} ctx={ctx as any} me={playerID} moves={moves} />
+      <GodBoard G={G} ctx={ctx} me={me} moves={moves} />
     </div>
   );
 }
@@ -70,9 +80,10 @@ function PlayersCorners({ G, ctx, activeId, me }: {
             style={{ ['--pc' as any]: p.color }}>
             <div className="pc-name"><span className="pc-dot" style={{ background: p.color }} />{p.name}{pid === me ? ' (вы)' : ''}</div>
             <div className="pc-stats">
-              <span title="золото">🪙{p.gold}</span>
-              <span title="жрецы">⚜️{p.priests}</span>
-              <span title="философы">📜{p.philosophers}</span>
+              {/* Чужие золото/жрецы/философы скрыты. */}
+              <span title="золото">🪙{pid === me ? p.gold : '?'}</span>
+              <span title="жрецы">⚜️{pid === me ? p.priests : '?'}</span>
+              <span title="философы">📜{pid === me ? p.philosophers : '?'}</span>
               <span title="метрополии">🏛️{metropolisCount(G, pid)}</span>
             </div>
           </div>

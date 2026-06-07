@@ -15,9 +15,8 @@ describe('интеграция фаз через boardgame.io', () => {
     const client = makeClient(2);
     const { G, ctx } = client.getState()!;
     expect(ctx.phase).toBe('auction');
-    // 5 стартовых + доход с рогов (0 или 1 в зависимости от старта флота).
+    // 5 стартовых + доход с рогов (у красного остров Серифос с рогами).
     expect(G.players['0'].gold).toBeGreaterThanOrEqual(5);
-    expect(G.players['0'].gold).toBeLessThanOrEqual(6);
     expect(G.auction).not.toBeNull();
     expect(G.auction!.toAct).toBe(ctx.currentPlayer);
   });

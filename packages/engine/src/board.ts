@@ -167,3 +167,17 @@ export function isIsland(t: Territory): t is Island {
 export function isSea(t: Territory): t is Sea {
   return t.kind === 'sea';
 }
+
+/** Остров, занимающий клетку (row,col), либо undefined. */
+export function islandAtCell(territories: Record<TerritoryId, Territory>, row: number, col: number): Island | undefined {
+  for (const t of Object.values(territories)) {
+    if (isIsland(t) && t.cells.some((c) => c.row === row && c.col === col)) return t;
+  }
+  return undefined;
+}
+
+/** Морская клетка (row,col), либо undefined. */
+export function seaAtCell(territories: Record<TerritoryId, Territory>, row: number, col: number): Sea | undefined {
+  const t = territories[`s_${row}_${col}`];
+  return t && isSea(t) ? t : undefined;
+}

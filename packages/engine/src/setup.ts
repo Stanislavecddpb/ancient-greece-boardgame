@@ -3,23 +3,52 @@ import {
   type CycladesState,
   type PlayerData,
   type PlayerID,
-  type Sea,
   PLAYER_COLORS,
   STARTING_GOLD,
   UNIT_SUPPLY,
 } from './types';
-import { createBoard, homeIslandsFor, isIsland, isSea } from './board';
+import { createBoard, islandAtCell, seaAtCell } from './board';
 
-const START_TROOPS = 3;
-const START_FLEETS = 1;
+// Стартовое размещение по цветам (индекс места): красный, чёрный, синий, жёлтый.
+// soldiers — клетки суши (по 1 войску), ships — морские клетки (по 1 флоту).
+interface Placement {
+  soldiers: [number, number][];
+  ships: [number, number][];
+}
+const PLACEMENTS: Placement[] = [
+  { soldiers: [[2, 1], [7, 6]], ships: [[2, 3], [6, 7]] }, // красный
+  { soldiers: [[3, 5], [7, 1]], ships: [[6, 1], [4, 6]] }, // чёрный
+  { soldiers: [[5, 2], [9, 6]], ships: [[6, 3], [9, 5]] }, // синий
+  { soldiers: [[5, 5], [10, 2]], ships: [[6, 5], [11, 1]] }, // жёлтый
+];
 
 /** Строит начальное состояние партии под число игроков из ctx. */
 export function setupGame(ctx: Ctx): CycladesState {
   const territories = createBoard();
-  const homes = homeIslandsFor(ctx.numPlayers);
   const players: Record<PlayerID, PlayerData> = {};
 
   ctx.playOrder.forEach((pid, i) => {
+    const place = PLACEMENTS[i];
+    let troopsPlaced = 0;
+    let fleetsPlaced = 0;
+
+    for (const [r, c] of place.soldiers) {
+      const isl = islandAtCell(territories, r, c);
+      if (isl) {
+        isl.ownerId = pid;
+        isl.troops += 1;
+        troopsPlaced += 1;
+      }
+    }
+    for (const [r, c] of place.ships) {
+      const sea = seaAtCell(territories, r, c);
+      if (sea) {
+        sea.ownerId = pid;
+        sea.fleets += 1;
+        fleetsPlaced += 1;
+      }
+    }
+
     players[pid] = {
       id: pid,
       name: `Игрок ${Number(pid) + 1}`,
@@ -27,28 +56,10 @@ export function setupGame(ctx: Ctx): CycladesState {
       gold: STARTING_GOLD,
       priests: 0,
       philosophers: 0,
-      troopsSupply: UNIT_SUPPLY - START_TROOPS,
-      fleetsSupply: UNIT_SUPPLY - START_FLEETS,
+      troopsSupply: UNIT_SUPPLY - troopsPlaced,
+      fleetsSupply: UNIT_SUPPLY - fleetsPlaced,
       isEliminated: false,
     };
-
-    // Домашний остров: войска на нём + один флот в соседнем море.
-    const homeId = homes[i];
-    const home = territories[homeId];
-    if (isIsland(home)) {
-      home.ownerId = pid;
-      home.troops = START_TROOPS;
-      // Флот ставим на свободную соседнюю клетку, предпочитая клетку с рогом
-      // изобилия (чтобы был стартовый доход).
-      const adjacent = home.adjacentSeas
-        .map((id) => territories[id])
-        .filter((t): t is Sea => !!t && isSea(t) && t.fleets === 0);
-      const target = adjacent.find((s) => s.cornucopia > 0) ?? adjacent[0];
-      if (target) {
-        target.ownerId = pid;
-        target.fleets = START_FLEETS;
-      }
-    }
   });
 
   return {

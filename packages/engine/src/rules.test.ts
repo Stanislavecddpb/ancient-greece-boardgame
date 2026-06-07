@@ -36,14 +36,16 @@ describe('setup', () => {
     const G = setupGame(ctx);
     expect(Object.keys(G.players)).toHaveLength(2);
     expect(G.players['0'].gold).toBe(5);
-    // Домашние острова для 2 игроков — по диагонали.
+    // Красный (0) ставит войска на Афины (2,1) и Серифос (7,6).
     expect(G.territories['home_n'].kind === 'island' && G.territories['home_n'].ownerId).toBe('0');
-    expect(G.territories['home_s'].kind === 'island' && G.territories['home_s'].ownerId).toBe('1');
-    const home0 = G.territories['home_n'];
-    if (home0.kind === 'island') expect(home0.troops).toBe(3);
-    // По одному флоту у каждого где-то стоит.
+    expect(G.territories['serifos'].kind === 'island' && G.territories['serifos'].ownerId).toBe('0');
+    // Чёрный (1) — на Спарту (3,5) и Коринф (7,1).
+    expect(G.territories['home_e'].kind === 'island' && G.territories['home_e'].ownerId).toBe('1');
+    const ath = G.territories['home_n'];
+    if (ath.kind === 'island') expect(ath.troops).toBe(1);
+    // По 2 флота у каждого из 2 игроков.
     const fleets = Object.values(G.territories).filter((t) => t.kind === 'sea' && t.fleets > 0);
-    expect(fleets).toHaveLength(2);
+    expect(fleets).toHaveLength(4);
   });
 });
 
@@ -51,9 +53,10 @@ describe('доход', () => {
   it('начисляет золото за рога изобилия, занятые флотом', () => {
     const ctx = ctxFor(2);
     const G = setupGame(ctx);
-    // Обнуляем все флоты, затем ставим один флот игрока 0 на клетку с рогом.
+    // Обнуляем флоты и владение островами, чтобы считать только заданный рог.
     for (const t of Object.values(G.territories)) {
       if (t.kind === 'sea') { t.fleets = 0; t.ownerId = null; }
+      if (t.kind === 'island') t.ownerId = null;
     }
     const corn = Object.values(G.territories).find((t) => t.kind === 'sea' && t.cornucopia > 0);
     expect(corn).toBeDefined();
@@ -62,7 +65,6 @@ describe('доход', () => {
       corn.fleets = 1;
       expect(incomeFor(G, '0')).toBe(1);
     }
-    // Игрок 1 без флота на рогах — без дохода.
     const before1 = G.players['1'].gold;
     applyIncome(G);
     expect(G.players['1'].gold).toBe(before1);
@@ -77,17 +79,25 @@ describe('доход', () => {
 });
 
 describe('аукцион', () => {
-  it('godsForCycle выдаёт numPlayers богов и ротируется по циклам', () => {
-    expect(godsForCycle(4, 1)).toEqual(['ares', 'poseidon', 'zeus', 'athena']);
-    expect(godsForCycle(2, 1)).toEqual(['ares', 'poseidon']);
-    expect(godsForCycle(2, 2)).toEqual(['poseidon', 'zeus']);
+  it('godsForCycle выдаёт (игроки−1) богов и ротируется по циклам', () => {
+    expect(godsForCycle(4, 1)).toEqual(['ares', 'poseidon', 'zeus']);
+    expect(godsForCycle(2, 1)).toEqual(['ares']);
+    expect(godsForCycle(2, 2)).toEqual(['poseidon']);
+    expect(godsForCycle(5, 1)).toEqual(['ares', 'poseidon', 'zeus', 'athena']);
   });
 
   it('вытеснение: перебитый игрок снова ходит и оплата считается с учётом жрецов', () => {
     const ctx = ctxFor(2);
     const G = setupGame(ctx);
-    setupAuction(G, ctx);
-    expect(G.auction!.toAct).toBe('0');
+    // Ручной аукцион с двумя богами для проверки вытеснения.
+    G.auction = {
+      slots: [
+        { god: 'ares', occupantId: null, bid: 0 },
+        { god: 'poseidon', occupantId: null, bid: 0 },
+      ],
+      apollo: [],
+      toAct: '0',
+    };
 
     expect(applyBid(G, ctx, '0', 'ares', 2)).toBeNull(); // '0' встаёт на Ареса
     expect(G.auction!.toAct).toBe('1');
@@ -126,8 +136,9 @@ describe('аукцион', () => {
     expect(applyApollo(G, ctx, '1')).toBeNull();
     expect(auctionComplete(G, ctx)).toBe(true);
     const g0 = G.players['0'].gold;
+    const expected = islandsOf(G, '0').length <= 1 ? 4 : 1;
     resolveAuction(G, ctx);
-    expect(G.players['0'].gold).toBe(g0 + 2); // первый получил +2
+    expect(G.players['0'].gold).toBe(g0 + expected);
   });
 });
 
@@ -148,7 +159,7 @@ describe('действия', () => {
     expect(G.players['0'].gold).toBe(gold0 - 2);
     expect(G.players['0'].troopsSupply).toBe(supply0 - 2);
     const home0 = G.territories['home_n'];
-    if (home0.kind === 'island') expect(home0.troops).toBe(5); // было 3 + 2
+    if (home0.kind === 'island') expect(home0.troops).toBe(3); // было 1 + 2
   });
 
   it('нельзя нанимать войска на чужой остров', () => {

@@ -2,7 +2,7 @@ import { Client } from 'boardgame.io/react';
 import { SocketIO } from 'boardgame.io/multiplayer';
 import { LobbyClient } from 'boardgame.io/client';
 import { CycladesGame, GAME_ID } from '@cyclades/engine';
-import { Board } from './Board';
+import { NetBoard as Board } from './Board';
 
 // Сервер по умолчанию — тот же хост, что отдал клиент, порт 3001.
 // Это позволяет друзьям в одной сети подключаться по локальному IP без правок.

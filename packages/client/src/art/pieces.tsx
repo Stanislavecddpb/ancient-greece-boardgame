@@ -13,30 +13,67 @@ function darken(hex: string, amount = 0.7): string {
   return `rgb(${r},${g},${b})`;
 }
 
-/** Трирема (флот) в цвете игрока. */
-export function Trireme({ color }: { color: string }) {
-  const dark = darken(color, 0.6);
+const RIM = '#f4f1e6'; // светлый кант для читаемости (особенно для чёрного)
+
+/** Трирема (флот) в цвете игрока; variant 0..3 — разный парус. */
+export function Trireme({ color, variant = 0 }: { color: string; variant?: number }) {
+  const dark = darken(color, 0.62);
+  const sail = () => {
+    switch (variant % 4) {
+      case 0: return <path d="M0 -12 L9 -3 L0 -3 Z" fill={color} stroke={RIM} strokeWidth="0.7" />; // один треуг.
+      case 1: return <> {/* два паруса */}
+        <path d="M0 -12 L7 -4 L0 -4 Z" fill={color} stroke={RIM} strokeWidth="0.6" />
+        <path d="M0 -8 L-7 -2 L0 -2 Z" fill={color} stroke={RIM} strokeWidth="0.6" /></>;
+      case 2: return <rect x="-6" y="-12" width="12" height="9" rx="1" fill={color} stroke={RIM} strokeWidth="0.7" />; // квадр. парус
+      default: return <path d="M0 -14 L8 -2 L-8 -2 Z" fill={color} stroke={RIM} strokeWidth="0.7" />; // высокий
+    }
+  };
   return (
     <g filter="url(#pieceShadow)">
-      {/* парус */}
-      <path d="M0 -12 L9 -3 L0 -3 Z" fill={color} stroke={dark} strokeWidth="0.8" />
-      <line x1="0" y1="-13" x2="0" y2="-2" stroke={dark} strokeWidth="1.4" />
-      {/* корпус */}
-      <path d="M-13 -1 C-9 6 9 6 13 -1 L9 3 C4 6 -4 6 -9 3 Z" fill={dark} stroke="#1b2b3a" strokeWidth="0.8" />
-      {/* вёсла */}
-      <path d="M-9 1 l-3 3 M-4 2 l-2 3 M4 2 l2 3 M9 1 l3 3" stroke="#1b2b3a" strokeWidth="0.7" />
+      {sail()}
+      <line x1="0" y1="-13" x2="0" y2="-2" stroke={dark} strokeWidth="1.3" />
+      <path d="M-13 -1 C-9 6 9 6 13 -1 L9 3 C4 6 -4 6 -9 3 Z" fill={dark} stroke={RIM} strokeWidth="0.8" />
+      <path d="M-9 1 l-3 3 M-4 2 l-2 3 M4 2 l2 3 M9 1 l3 3" stroke={dark} strokeWidth="0.7" />
     </g>
   );
 }
 
-/** Воин (сухопутный отряд): гоплитский щит с копьём. */
-export function Hoplite({ color }: { color: string }) {
+/** Воин (сухопутный отряд) в цвете игрока; variant 0..3 — разное оружие/эмблема. */
+export function Hoplite({ color, variant = 0 }: { color: string; variant?: number }) {
   const dark = darken(color, 0.55);
+  const weapon = () => {
+    switch (variant % 4) {
+      case 0: return <line x1="-8" y1="-10" x2="6" y2="8" stroke="#6a513099" strokeWidth="1.6" />; // копьё
+      case 1: return <><line x1="7" y1="-9" x2="-3" y2="6" stroke="#9aa3ad" strokeWidth="1.8" /><line x1="3" y1="-7" x2="9" y2="-5" stroke="#9aa3ad" strokeWidth="1.6" /></>; // меч
+      case 2: return <><line x1="-8" y1="-10" x2="6" y2="8" stroke="#6a513099" strokeWidth="1.4" /><line x1="8" y1="-10" x2="-6" y2="8" stroke="#6a513099" strokeWidth="1.4" /></>; // два копья
+      default: return <><line x1="6" y1="-10" x2="-2" y2="7" stroke="#9aa3ad" strokeWidth="1.6" /><path d="M3 -10 a4 4 0 1 0 6 2 Z" fill="#9aa3ad" /></>; // топор
+    }
+  };
+  const emblem = () => {
+    switch (variant % 4) {
+      case 0: return <path d="M0 -5 L-3.6 4 M0 -5 L3.6 4" stroke={RIM} strokeWidth="1.5" fill="none" />; // Λ
+      case 1: return <path d="M-3.5 -3 L3.5 4 M3.5 -3 L-3.5 4" stroke={RIM} strokeWidth="1.4" fill="none" />; // X
+      case 2: return <circle r="3.4" fill="none" stroke={RIM} strokeWidth="1.4" />; // O
+      default: return <path d="M0 -4 V4 M-4 0 H4" stroke={RIM} strokeWidth="1.4" />; // +
+    }
+  };
   return (
     <g filter="url(#pieceShadow)">
-      <line x1="-7" y1="-9" x2="7" y2="9" stroke="#5a4326" strokeWidth="1.6" />
-      <circle cx="0" cy="0" r="8" fill={color} stroke={dark} strokeWidth="1.4" />
-      <path d="M0 -5 L-3.6 4 M0 -5 L3.6 4" stroke="#fff" strokeWidth="1.5" fill="none" opacity="0.92" />
+      {weapon()}
+      <circle cx="0" cy="0" r="8" fill={color} stroke={RIM} strokeWidth="1.3" />
+      {emblem()}
+    </g>
+  );
+}
+
+/** Жетон контроля острова (без войск): щит-эмблема в цвете игрока. */
+export function ControlToken({ color }: { color: string }) {
+  const dark = darken(color, 0.6);
+  return (
+    <g filter="url(#pieceShadow)">
+      <path d="M0 -8 L7 -5 V2 C7 6 0 9 0 9 C0 9 -7 6 -7 2 V-5 Z" fill={color} stroke={RIM} strokeWidth="1.2" />
+      <path d="M0 -4 L-3 3 M0 -4 L3 3" stroke={RIM} strokeWidth="1.2" fill="none" opacity="0.9" />
+      <circle cx="0" cy="-1" r="1.4" fill={dark} />
     </g>
   );
 }

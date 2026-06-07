@@ -6,7 +6,7 @@ import {
   type PlayerID,
   COMPETITIVE_GODS,
 } from './types';
-import { log } from './helpers';
+import { log, islandsOf } from './helpers';
 
 /**
  * Боги, выставляемые на аукцион в этом цикле: numPlayers конкурентных богов
@@ -14,9 +14,12 @@ import { log } from './helpers';
  * выставляются все четыре конкурентных бога.
  */
 export function godsForCycle(numPlayers: number, cycle: number): GodName[] {
+  // Всего открыто богов = числу игроков, включая Аполлона. Значит конкурентных
+  // (не-Аполлон) богов выставляется numPlayers − 1.
+  const count = Math.min(numPlayers - 1, COMPETITIVE_GODS.length);
   const start = (cycle - 1) % COMPETITIVE_GODS.length;
   const chosen = new Set<GodName>();
-  for (let i = 0; i < numPlayers && i < COMPETITIVE_GODS.length; i++) {
+  for (let i = 0; i < count; i++) {
     chosen.add(COMPETITIVE_GODS[(start + i) % COMPETITIVE_GODS.length]);
   }
   // Сохраняем канонический порядок исполнения.
@@ -120,11 +123,13 @@ export function resolveAuction(G: CycladesState, ctx: Ctx): void {
     log(G, `${player.name} получает ${godLabel(slot.god)}, заплатив ${pay} золота.`);
   }
 
-  // Аполлон: бонус золотом (заглушка вместо маркера процветания в MVP).
+  // Аполлон: контролирующий ≤1 остров получает 4 золота, иначе 1.
+  // Первый выбравший Аполлона дополнительно получает рог изобилия (TODO: класть на остров).
   a.apollo.forEach((pid, idx) => {
-    const bonus = idx === 0 ? 2 : 1;
-    G.players[pid].gold += bonus;
-    log(G, `${G.players[pid].name} следует за Аполлоном (+${bonus} золота).`);
+    const gold = islandsOf(G, pid).length <= 1 ? 4 : 1;
+    G.players[pid].gold += gold;
+    const extra = idx === 0 ? ' (+рог изобилия)' : '';
+    log(G, `${G.players[pid].name} следует за Аполлоном (+${gold} золота${extra}).`);
   });
   // Внимание: сам G.auction обнуляется вызывающей стороной ПОСЛЕ построения
   // очереди действий (startActionsPhase читает слоты).

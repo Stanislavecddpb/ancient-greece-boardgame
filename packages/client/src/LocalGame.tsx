@@ -1,28 +1,21 @@
-import { useState } from 'react';
 import { Client } from 'boardgame.io/react';
-import { Local } from 'boardgame.io/multiplayer';
 import { CycladesGame } from '@cyclades/engine';
-import { Board } from './Board';
+import { HotseatBoard } from './Board';
 
-// Хотсит: один экран, переключаем активное «место» кнопкой.
-const LocalClient = Client({
+// Хотсит: один экран, один клиент без сервера.
+// HotseatBoard сам определяет «меня» как ctx.currentPlayer,
+// поэтому каждый игрок видит свои данные в свой ход.
+const HotseatClient = Client({
   game: CycladesGame,
-  board: Board,
-  numPlayers: 2,
-  multiplayer: Local(),
+  board: HotseatBoard,
+  numPlayers: 4,
   debug: false,
 });
 
 export function LocalGame() {
-  const [seat, setSeat] = useState(0);
   return (
     <div className="local-wrap">
-      <div className="local-bar">
-        <a href="#/" className="back">← выход</a>
-        <span>Хотсит — место: <b>Игрок {seat + 1}</b></span>
-        <button onClick={() => setSeat((s) => (s + 1) % 2)}>Передать ход →</button>
-      </div>
-      <LocalClient key={seat} matchID="local" playerID={String(seat)} />
+      <HotseatClient matchID="local" />
     </div>
   );
 }

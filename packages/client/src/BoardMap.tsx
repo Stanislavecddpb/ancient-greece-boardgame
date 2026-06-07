@@ -12,7 +12,7 @@ import {
   BOARD_VIEWBOX,
 } from '@cyclades/engine';
 import { SvgDefs } from './art/SvgDefs';
-import { Trireme, Hoplite, BuildingGlyph, Metropolis, CoinStack } from './art/pieces';
+import { Trireme, Hoplite, BuildingGlyph, Metropolis, CoinStack, ControlToken } from './art/pieces';
 
 interface Props {
   G: CycladesState;
@@ -24,8 +24,22 @@ interface Props {
 const SEA_R = CELL_D * 0.46;
 const LAND_R = CELL_D * 0.5;
 
-// Фишки (войска/флот/здания) временно скрыты — доводим интерфейс поля богов.
-const SHOW_PIECES = false;
+const SHOW_PIECES = true;
+
+const seatOf = (pid: string) => Number(pid);
+
+/** Смещения для размещения n фишек в клетке. */
+function offsets(n: number, kind: 'troop' | 'fleet'): Array<{ x: number; y: number }> {
+  if (kind === 'troop') {
+    if (n <= 1) return [{ x: 0, y: 0 }];
+    if (n === 2) return [{ x: -15, y: 0 }, { x: 15, y: 0 }];
+    return [{ x: -20, y: -2 }, { x: 0, y: 4 }, { x: 20, y: -2 }];
+  }
+  if (n <= 1) return [{ x: 0, y: 0 }];
+  if (n === 2) return [{ x: -13, y: 0 }, { x: 13, y: 0 }];
+  if (n === 3) return [{ x: -14, y: -8 }, { x: 14, y: -8 }, { x: 0, y: 8 }];
+  return [{ x: -13, y: -9 }, { x: 13, y: -9 }, { x: -13, y: 9 }, { x: 13, y: 9 }];
+}
 
 export function BoardMap({ G, me, selected, onSelect }: Props) {
   const territories = Object.values(G.territories);
@@ -84,12 +98,14 @@ function SeaCell({ sea, G, selected, color, onSelect }: {
           <CoinStack count={sea.cornucopia} />
         </g>
       )}
-      {SHOW_PIECES && sea.fleets > 0 && (
-        <g transform={`translate(${x} ${y - 2})`}>
-          <motion.g initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1.5, opacity: 1 }}>
-            <Trireme color={G.players[sea.ownerId!].color} />
-            {sea.fleets > 1 && <Badge x={15} y={-9} text={sea.fleets} />}
-          </motion.g>
+      {SHOW_PIECES && sea.fleets > 0 && sea.ownerId && (
+        <g>
+          {offsets(Math.min(sea.fleets, 4), 'fleet').map((o, i) => (
+            <g key={i} transform={`translate(${x + o.x} ${y + o.y}) scale(0.82)`}>
+              <Trireme color={G.players[sea.ownerId!].color} variant={seatOf(sea.ownerId!)} />
+            </g>
+          ))}
+          {sea.fleets > 4 && <Badge x={x + SEA_R - 4} y={y - SEA_R + 4} text={sea.fleets} />}
         </g>
       )}
     </g>
@@ -136,22 +152,32 @@ function IslandNode({ isl, G, me, selected, color, onSelect }: {
         </g>
       ))}
 
+      {/* жетон контроля (если островом владеют) */}
+      {SHOW_PIECES && owned && (
+        <g transform={`translate(${isl.pos.x} ${isl.pos.y - LAND_R * 0.75}) scale(0.9)`}>
+          <ControlToken color={G.players[isl.ownerId!].color} />
+        </g>
+      )}
+
       {SHOW_PIECES && (isl.hasMetropolis ? (
-        <g transform={`translate(${isl.pos.x} ${isl.pos.y})`}><Metropolis /></g>
+        <g transform={`translate(${isl.pos.x} ${isl.pos.y - 2})`}><Metropolis /></g>
       ) : (
         isl.buildings.map((b, i) => {
           const n = isl.buildings.length;
-          const bx = isl.pos.x + (i - (n - 1) / 2) * 24;
-          return <g key={i} transform={`translate(${bx} ${isl.pos.y - 2}) scale(1.3)`}><BuildingGlyph type={b.type} /></g>;
+          const bx = isl.pos.x + (i - (n - 1) / 2) * 22;
+          return <g key={i} transform={`translate(${bx} ${isl.pos.y - LAND_R * 0.1}) scale(1.15)`}><BuildingGlyph type={b.type} /></g>;
         })
       ))}
 
-      {SHOW_PIECES && isl.troops > 0 && (
-        <g transform={`translate(${isl.pos.x} ${isl.pos.y + LAND_R - 4})`}>
-          <motion.g initial={{ scale: 0.7 }} animate={{ scale: 1.6 }}>
-            <Hoplite color={G.players[isl.ownerId!].color} />
-            {isl.troops > 1 && <Badge x={12} y={-10} text={isl.troops} />}
-          </motion.g>
+      {/* войска (до 3 фигур + счётчик) */}
+      {SHOW_PIECES && isl.troops > 0 && isl.ownerId && (
+        <g>
+          {offsets(Math.min(isl.troops, 3), 'troop').map((o, i) => (
+            <g key={i} transform={`translate(${isl.pos.x + o.x} ${isl.pos.y + LAND_R * 0.45 + o.y}) scale(1.05)`}>
+              <Hoplite color={G.players[isl.ownerId!].color} variant={seatOf(isl.ownerId!)} />
+            </g>
+          ))}
+          {isl.troops > 3 && <Badge x={isl.pos.x + 22} y={isl.pos.y + LAND_R * 0.45 - 12} text={isl.troops} />}
         </g>
       )}
     </motion.g>
