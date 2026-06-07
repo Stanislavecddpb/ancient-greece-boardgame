@@ -24,7 +24,7 @@ import {
 } from './actions';
 import { metropolisCount, islandsOf } from './helpers';
 import { applyBuyCreature, applyCycleCreatures } from './creatures';
-import { applyFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat } from './movement';
+import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat } from './movement';
 import { dieFromRandom } from './combat';
 import type { TerritoryId as TId } from './types';
 
@@ -104,29 +104,40 @@ export const CycladesGame: Game<CycladesState> = {
       moves: {
         recruit: ({ G, playerID }, targetId?: TerritoryId) => {
           const turn = currentTurn(G);
-          if (G.combat || !turn || turn.playerId !== playerID) return INVALID_MOVE;
+          if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID) return INVALID_MOVE;
           const err = applyRecruit(G, playerID!, turn.god, targetId);
           if (err) return INVALID_MOVE;
         },
 
         build: ({ G, playerID }, islandId: TerritoryId) => {
           const turn = currentTurn(G);
-          if (G.combat || !turn || turn.playerId !== playerID) return INVALID_MOVE;
+          if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID) return INVALID_MOVE;
           const err = applyBuild(G, playerID!, turn.god, islandId);
           if (err) return INVALID_MOVE;
         },
 
-        // Посейдон: перемещение флота (с возможным морским боем).
-        moveFleet: ({ G, playerID }, fromId: TId, toId: TId) => {
+        // Посейдон: начать приказ флоту (1🪙 на первом переходе).
+        startFleetMove: ({ G, playerID }, seaId: TId) => {
           const turn = currentTurn(G);
           if (G.combat || !turn || turn.playerId !== playerID || turn.god !== 'poseidon') return INVALID_MOVE;
-          if (applyFleetMove(G, playerID!, fromId, toId)) return INVALID_MOVE;
+          if (startFleetMove(G, playerID!, seaId)) return INVALID_MOVE;
+        },
+
+        // Посейдон: один переход приказа (ведём take кораблей в соседнюю клетку).
+        hopFleet: ({ G, playerID }, toId: TId, take: number) => {
+          if (G.combat) return INVALID_MOVE;
+          if (hopFleet(G, playerID!, toId, take)) return INVALID_MOVE;
+        },
+
+        // Посейдон: завершить приказ флоту досрочно.
+        endFleetMove: ({ G, playerID }) => {
+          if (endFleetMove(G, playerID!)) return INVALID_MOVE;
         },
 
         // Арес: перемещение войск по «мосту» из флотов (с возможным сухопутным боем).
         moveTroops: ({ G, playerID }, fromId: TId, toId: TId, count: number) => {
           const turn = currentTurn(G);
-          if (G.combat || !turn || turn.playerId !== playerID || turn.god !== 'ares') return INVALID_MOVE;
+          if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID || turn.god !== 'ares') return INVALID_MOVE;
           if (applyTroopMove(G, playerID!, fromId, toId, count)) return INVALID_MOVE;
         },
 
@@ -143,14 +154,14 @@ export const CycladesGame: Game<CycladesState> = {
         // Покупка мифического существа с рынка (одно за активацию любого бога).
         buyCreature: ({ G, playerID }, slotIndex: number, targetId?: TId) => {
           const turn = currentTurn(G);
-          if (G.combat || !turn || turn.playerId !== playerID) return INVALID_MOVE;
+          if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID) return INVALID_MOVE;
           if (applyBuyCreature(G, playerID!, slotIndex, targetId)) return INVALID_MOVE;
         },
 
         // Зевс: прокрутить колоду существ за 1 золото.
         cycleCreatures: ({ G, playerID }) => {
           const turn = currentTurn(G);
-          if (G.combat || !turn || turn.playerId !== playerID || turn.god !== 'zeus') return INVALID_MOVE;
+          if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID || turn.god !== 'zeus') return INVALID_MOVE;
           if (applyCycleCreatures(G, playerID!)) return INVALID_MOVE;
         },
 
@@ -168,7 +179,7 @@ export const CycladesGame: Game<CycladesState> = {
 
         endGod: ({ G, ctx, playerID, events }) => {
           const turn = currentTurn(G);
-          if (G.combat || !turn || turn.playerId !== playerID) return INVALID_MOVE;
+          if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID) return INVALID_MOVE;
           const done = advanceTurn(G);
           if (done) {
             endCycle(G, ctx);

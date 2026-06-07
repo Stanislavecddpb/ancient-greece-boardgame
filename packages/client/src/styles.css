@@ -94,6 +94,8 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 .combat-vs { opacity: 0.6; font-size: 0.8rem; }
 .combat-roll { font-size: 0.78rem; opacity: 0.85; background: #2a1414; padding: 2px 7px; border-radius: 6px; }
 .action-bar.combat button { background: #b3602f; }
+.action-bar.fleetmove { border-color: #2f7da8; box-shadow: 0 0 0 1px #2f7da855, 0 0 18px #2f7da844; }
+.action-bar.fleetmove input { border-radius: 5px; border: 1px solid #2a3f5a; background: #0f1b2a; color: #e8eef5; }
 
 /* стрелки перемещения */
 .mv-target { fill: #ffd76a; opacity: 0.16; }

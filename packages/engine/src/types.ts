@@ -175,6 +175,24 @@ export interface CombatState {
   lastRoll: { attacker: number; defender: number; aLost: boolean; dLost: boolean } | null;
 }
 
+/**
+ * Активный «приказ флоту» (Посейдон): за 1 монету ведём группу кораблей с одной
+ * клетки на расстояние до 3, по пути можно высаживать корабли.
+ */
+export interface FleetMoveState {
+  playerId: PlayerID;
+  /** Где сейчас ведущая группа. */
+  at: TerritoryId;
+  /** Сколько кораблей в ведущей группе. */
+  carrying: number;
+  /** Сколько ещё переходов осталось (старт — дальность хода). */
+  stepsLeft: number;
+  /** Откуда начался приказ. */
+  origin: TerritoryId;
+  /** Списана ли монета (на первом переходе). */
+  paid: boolean;
+}
+
 /** Рынок мифических существ: колода, открытые карты, сброс. */
 export interface CreatureMarket {
   /** Колода рубашкой вверх (берём с начала). */
@@ -207,6 +225,8 @@ export interface CycladesState {
   pendingCornucopia: PlayerID | null;
   /** Текущий бой (пошаговый с возможностью отступления) или null. */
   combat: CombatState | null;
+  /** Активный приказ флоту (Посейдон) или null. */
+  fleetMove: FleetMoveState | null;
   log: LogEntry[];
 }
 

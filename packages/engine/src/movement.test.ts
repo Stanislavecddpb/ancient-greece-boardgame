@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Ctx } from 'boardgame.io';
 import { setupGame } from './setup';
-import { fleetReachable, applyFleetMove, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat } from './movement';
+import { startFleetMove, hopFleet, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat } from './movement';
 import { isSea, isIsland } from './board';
 import type { CycladesState, Sea } from './types';
 
@@ -20,32 +20,76 @@ function fightToEnd(G: CycladesState, pid: string, roll = 0): void {
   while (G.combat && guard++ < 50) applyCombatRound(G, pid, always(roll));
 }
 
-describe('движение флота', () => {
-  it('флот перемещается на пустую соседнюю клетку', () => {
+describe('приказ флоту (Посейдон)', () => {
+  /** Своя клетка с флотом и соседняя пустая морская клетка. */
+  function adjEmpty(G: CycladesState) {
+    const a = freshSeas(G).find((s) => s.ownerId === '0' && s.fleets > 0
+      && s.adjacentSeas.some((nb) => { const t = G.territories[nb]; return t && isSea(t) && t.fleets === 0; }))!;
+    const bId = a.adjacentSeas.find((nb) => { const t = G.territories[nb]; return t && isSea(t) && t.fleets === 0; })!;
+    return { a, b: G.territories[bId] as Sea };
+  }
+
+  it('переход в соседнюю пустую клетку стоит 1 монету', () => {
     const G = setupGame(ctxFor(2));
-    const own = freshSeas(G).find((s) => s.ownerId === '0' && s.fleets > 0)!;
-    const reach = fleetReachable(G, own.id, '0');
-    expect(reach.size).toBeGreaterThan(0);
-    const destId = [...reach].find((id) => {
-      const t = G.territories[id];
-      return t && isSea(t) && t.fleets === 0;
+    G.players['0'].gold = 5;
+    const { a, b } = adjEmpty(G);
+    const moved = a.fleets;
+    expect(startFleetMove(G, '0', a.id)).toBeNull();
+    expect(hopFleet(G, '0', b.id, moved)).toBeNull();
+    expect(b.fleets).toBe(moved);
+    expect(a.fleets).toBe(0);
+    expect(G.players['0'].gold).toBe(4); // списана 1 монета
+  });
+
+  it('нельзя начать приказ без монеты', () => {
+    const G = setupGame(ctxFor(2));
+    const { a } = adjEmpty(G);
+    G.players['0'].gold = 0;
+    expect(startFleetMove(G, '0', a.id)).toBe('нужна 1 монета');
+  });
+
+  it('высадка по пути: часть кораблей остаётся, часть идёт дальше', () => {
+    const G = setupGame(ctxFor(2));
+    G.players['0'].gold = 5;
+    // Строим цепочку из трёх своих/пустых клеток a→b→c.
+    const a = freshSeas(G).find((s) => {
+      const b = s.adjacentSeas.map((id) => G.territories[id]).find((t) => t && isSea(t) && t.fleets === 0) as Sea | undefined;
+      if (!b) return false;
+      const c = b.adjacentSeas.map((id) => G.territories[id]).find((t) => t && isSea(t) && t.fleets === 0 && t.id !== s.id) as Sea | undefined;
+      return !!c;
     })!;
-    const moved = own.fleets;
-    expect(applyFleetMove(G, '0', own.id, destId)).toBeNull();
-    expect((G.territories[destId] as Sea).fleets).toBe(moved);
-    expect(own.fleets).toBe(0);
+    const b = a.adjacentSeas.map((id) => G.territories[id]).find((t) => t && isSea(t) && t.fleets === 0) as Sea;
+    const c = b.adjacentSeas.map((id) => G.territories[id]).find((t) => t && isSea(t) && t.fleets === 0 && t.id !== a.id) as Sea;
+    a.ownerId = '0'; a.fleets = 3;
+
+    expect(startFleetMove(G, '0', a.id)).toBeNull();
+    expect(hopFleet(G, '0', b.id, 3)).toBeNull();   // ведём все 3 в b
+    expect(hopFleet(G, '0', c.id, 2)).toBeNull();   // 2 идут в c, 1 остаётся в b
+    expect(b.fleets).toBe(1);
+    expect(c.fleets).toBe(2);
+    expect(G.players['0'].gold).toBe(4); // одна монета на весь приказ
+  });
+
+  it('дальность ограничена 3 переходами', () => {
+    const G = setupGame(ctxFor(2));
+    G.players['0'].gold = 9;
+    const own = freshSeas(G).find((s) => s.ownerId === '0' && s.fleets > 0)!;
+    expect(startFleetMove(G, '0', own.id)).toBeNull();
+    expect(G.fleetMove!.stepsLeft).toBe(3);
   });
 
   it('морской бой: перевес атакующего захватывает клетку', () => {
     const G = setupGame(ctxFor(2));
-    // Берём две соседние морские клетки.
+    G.players['0'].gold = 5;
     const a = freshSeas(G).find((s) => s.adjacentSeas.some((nb) => { const t = G.territories[nb]; return t && isSea(t); }))!;
     const bId = a.adjacentSeas.find((nb) => { const t = G.territories[nb]; return t && isSea(t); })!;
     const b = G.territories[bId] as Sea;
     a.ownerId = '0'; a.fleets = 3;
     b.ownerId = '1'; b.fleets = 1;
-    expect(applyFleetMove(G, '0', a.id, b.id)).toBeNull();
-    expect(G.combat).not.toBeNull(); // бой начался, ждёт раундов
+    expect(startFleetMove(G, '0', a.id)).toBeNull();
+    expect(hopFleet(G, '0', b.id, 3)).toBeNull();
+    expect(G.combat).not.toBeNull(); // бой начался
+    expect(G.fleetMove).toBeNull();  // приказ завершён
     fightToEnd(G, '0');
     expect(b.ownerId).toBe('0');
     expect(b.fleets).toBe(3);
@@ -85,18 +129,21 @@ describe('движение войск', () => {
 describe('интерактивный бой', () => {
   function setupNavalFight() {
     const G = setupGame(ctxFor(2));
+    G.players['0'].gold = 5;
     const a = freshSeas(G).find((s) => s.adjacentSeas.some((nb) => isSea(G.territories[nb])))!;
     const bId = a.adjacentSeas.find((nb) => isSea(G.territories[nb]))!;
     const b = G.territories[bId] as Sea;
     a.ownerId = '0'; a.fleets = 2;
     b.ownerId = '1'; b.fleets = 2;
+    startFleetMove(G, '0', a.id);
+    hopFleet(G, '0', b.id, 2); // атакуем всеми двумя
     return { G, a, b };
   }
 
   it('отступление возвращает выживших на исходную клетку', () => {
     const { G, a, b } = setupNavalFight();
-    expect(applyFleetMove(G, '0', a.id, b.id)).toBeNull();
     expect(a.fleets).toBe(0); // флот «в пути»
+    expect(G.combat).not.toBeNull();
     // один раунд по равенству (бросок 0) — обе стороны теряют по фишке
     applyCombatRound(G, '0', always(0));
     expect(G.combat!.attackerUnits).toBe(1);
@@ -110,8 +157,7 @@ describe('интерактивный бой', () => {
   });
 
   it('чужой не может управлять боем', () => {
-    const { G, a, b } = setupNavalFight();
-    applyFleetMove(G, '0', a.id, b.id);
+    const { G, b } = setupNavalFight();
     expect(applyCombatRound(G, '1', always(0))).toBe('не ваш бой');
     void b;
   });

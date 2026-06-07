@@ -14,7 +14,6 @@ import {
   recruitCost,
   freeSlots,
   canPlaceFleet,
-  fleetReachable,
   troopReachable,
   isIsland,
   isSea,
@@ -52,6 +51,7 @@ export function HotseatBoard(p: BoardProps<CycladesState>) {
 function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: any; me: string | null }) {
   const [selected, setSelected] = useState<TerritoryId | null>(null);
   const [troopCount, setTroopCount] = useState(1);
+  const [fleetTake, setFleetTake] = useState(99);
 
   if (ctx.gameover) {
     const w = G.players[ctx.gameover.winner];
@@ -60,20 +60,22 @@ function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: an
 
   const activeId = G.pendingCornucopia ?? (G.auction ? G.auction.toAct : activePlayerId(G));
 
-  // Контекст перемещения для стрелок на карте: выбрана своя фишка под нужным богом.
+  // Контекст перемещения для стрелок на карте.
   const turn = currentTurn(G);
   const sel = selected ? G.territories[selected] : null;
   const canAct = ctx.phase === 'actions' && !G.pendingCornucopia && !!turn && activePlayerId(G) === me;
   let movement: MovementCtx | null = null;
-  if (canAct && sel && me) {
-    if (turn!.god === 'poseidon' && isSea(sel) && sel.ownerId === me && sel.fleets > 0) {
-      const targets = [...fleetReachable(G, sel.id, me)];
-      if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.moveFleet(sel.id, to); setSelected(null); } };
-    } else if (turn!.god === 'ares' && isIsland(sel) && sel.ownerId === me && sel.troops > 0) {
-      const n = Math.min(troopCount, sel.troops);
-      const targets = [...troopReachable(G, sel.id, me)];
-      if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.moveTroops(sel.id, to, n); setSelected(null); } };
-    }
+  if (canAct && me && G.fleetMove && G.fleetMove.playerId === me) {
+    // Идёт приказ флоту: стрелки в соседние клетки от текущей позиции группы.
+    const at = G.territories[G.fleetMove.at];
+    const carrying = G.fleetMove.carrying;
+    const take = Math.min(Math.max(1, fleetTake), carrying);
+    const targets = isSea(at) ? at.adjacentSeas.filter((id) => isSea(G.territories[id])) : [];
+    movement = { from: G.fleetMove.at, targets, onMove: (to) => moves.hopFleet(to, take) };
+  } else if (canAct && me && !G.combat && sel && turn!.god === 'ares' && isIsland(sel) && sel.ownerId === me && sel.troops > 0) {
+    const n = Math.min(troopCount, sel.troops);
+    const targets = [...troopReachable(G, sel.id, me)];
+    if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.moveTroops(sel.id, to, n); setSelected(null); } };
   }
 
   return (
@@ -84,6 +86,8 @@ function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: an
         <div className="phase-tag">Цикл {G.cycle} · {phaseLabel(ctx.phase)}</div>
         {G.combat ? (
           <CombatPanel G={G} me={me} moves={moves} />
+        ) : G.fleetMove && G.fleetMove.playerId === me ? (
+          <FleetMovePanel G={G} moves={moves} take={fleetTake} setTake={setFleetTake} />
         ) : ctx.phase === 'actions' && G.pendingCornucopia ? (
           G.pendingCornucopia === me ? (
             <ProsperityPrompt G={G} me={me} moves={moves} selected={selected} />
@@ -155,6 +159,7 @@ function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove 
   // Источник перемещения войск выбран — показываем выбор количества; стрелки рисует карта.
   const troopSource = !!sel && isIsland(sel) && sel.ownerId === pid && sel.troops > 0 && god === 'ares';
   const fleetSource = !!sel && isSea(sel) && sel.ownerId === pid && sel.fleets > 0 && god === 'poseidon';
+  const canStartFleet = fleetSource && G.players[pid].gold >= 1;
 
   return (
     <div className="action-bar">
@@ -182,7 +187,10 @@ function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove 
             </span>
           )}
           {fleetSource && (
-            <span className="sel-hint">{hasMove ? '⛵ кликните стрелку на карте' : 'нет ходов'}</span>
+            <button disabled={!canStartFleet} onClick={() => moves.startFleetMove(selected)}
+              title="за 1 монету двигать корабли до 3 клеток, можно высаживать по пути">
+              ⛵ двинуть флот (1🪙)
+            </button>
           )}
           <CreatureButtons G={G} pid={pid} moves={moves} sel={sel} selected={selected} god={god} s={s} />
           <button className="end-turn" onClick={() => moves.endGod()}>Завершить →</button>
@@ -224,6 +232,27 @@ function CombatPanel({ G, me, moves }: { G: CycladesState; me: string | null; mo
         ) : (
           <span className="sel-hint">ход атакующего…</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+function FleetMovePanel({ G, moves, take, setTake }: {
+  G: CycladesState; moves: any; take: number; setTake: (n: number) => void;
+}) {
+  const m = G.fleetMove!;
+  const carrying = m.carrying;
+  const eff = Math.min(Math.max(1, take), carrying);
+  return (
+    <div className="action-bar fleetmove">
+      <div className="ab-title">⛵ Приказ флоту · осталось переходов: {m.stepsLeft}</div>
+      <div className="ab-controls">
+        <span>в группе: <b>{carrying}</b></span>
+        <span>вести:</span>
+        <input type="number" min={1} max={carrying} value={eff}
+          onChange={(e) => setTake(Math.max(1, Math.min(carrying, Number(e.target.value))))} style={{ width: 44 }} />
+        <span className="sel-hint">→ кликните стрелку (оставшиеся {carrying - eff} высадятся здесь)</span>
+        <button className="end-turn" onClick={() => moves.endFleetMove()}>Завершить движение</button>
       </div>
     </div>
   );

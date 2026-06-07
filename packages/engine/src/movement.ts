@@ -60,44 +60,77 @@ function navalDefenseBonus(G: CycladesState, seaId: TerritoryId, defenderId: Pla
   return bonus;
 }
 
-/** Двигает весь флот из fromId в toId; при встрече врага — начинает морской бой. */
-export function applyFleetMove(
-  G: CycladesState,
-  pid: PlayerID,
-  fromId: TerritoryId,
-  toId: TerritoryId,
-): string | null {
+/**
+ * Начинает «приказ флоту»: ведущая группа = все корабли на клетке. Монета спишется
+ * на первом переходе. Возвращает текст ошибки или null.
+ */
+export function startFleetMove(G: CycladesState, pid: PlayerID, seaId: TerritoryId): string | null {
   if (G.combat) return 'идёт бой';
-  const from = G.territories[fromId];
+  if (G.fleetMove) return 'уже идёт перемещение';
+  const sea = G.territories[seaId];
+  if (!sea || !isSea(sea) || sea.ownerId !== pid || sea.fleets <= 0) return 'нет своего флота';
+  if (G.players[pid].gold < 1) return 'нужна 1 монета';
+  G.fleetMove = { playerId: pid, at: seaId, carrying: sea.fleets, stepsLeft: FLEET_RANGE, origin: seaId, paid: false };
+  return null;
+}
+
+/**
+ * Один переход приказа: ведёт `take` кораблей из текущей клетки в соседнюю.
+ * Оставшиеся (carrying − take) высаживаются и остаются на месте. Вход во вражескую
+ * клетку начинает морской бой и завершает приказ.
+ */
+export function hopFleet(G: CycladesState, pid: PlayerID, toId: TerritoryId, take: number): string | null {
+  const m = G.fleetMove;
+  if (!m || m.playerId !== pid) return 'нет перемещения';
+  if (m.stepsLeft <= 0) return 'ходы закончились';
+  const at = G.territories[m.at];
   const to = G.territories[toId];
-  if (!from || !isSea(from) || from.ownerId !== pid || from.fleets <= 0) return 'нет своего флота';
-  if (!to || !isSea(to)) return 'цель — не море';
-  if (!fleetReachable(G, fromId, pid).has(toId)) return 'недостижимо';
+  if (!at || !isSea(at) || !to || !isSea(to)) return 'не море';
+  if (!at.adjacentSeas.includes(toId)) return 'не соседняя клетка';
+  if (!Number.isInteger(take) || take < 1 || take > m.carrying) return 'неверное число кораблей';
 
-  const moving = from.fleets;
+  // Оплата приказа — на первом переходе.
+  if (!m.paid) {
+    if (G.players[pid].gold < 1) return 'нужна 1 монета';
+    G.players[pid].gold -= 1;
+    m.paid = true;
+    log(G, `${G.players[pid].name}: приказ флоту (−1🪙).`);
+  }
+
+  // Снимаем ведомые корабли с текущей клетки.
+  at.fleets -= take;
+  if (at.fleets === 0) at.ownerId = null;
+
   const enemy = to.fleets > 0 && to.ownerId !== pid;
-
-  if (!enemy) {
-    to.fleets += moving;
-    to.ownerId = pid;
-    from.fleets = 0;
-    from.ownerId = null;
-    log(G, `${G.players[pid].name}: флот идёт ${moving} → ${to.name}.`);
+  if (enemy) {
+    const defenderId = to.ownerId!;
+    G.combat = {
+      kind: 'naval', location: toId, fromId: m.at,
+      attackerId: pid, defenderId,
+      attackerUnits: take, defenderUnits: to.fleets,
+      defenderBonus: navalDefenseBonus(G, toId, defenderId),
+      round: 0, lastRoll: null,
+    };
+    log(G, `${G.players[pid].name} атакует флот у ${to.name} (${take} против ${to.fleets}).`);
+    G.fleetMove = null; // приказ завершён — идёт бой
     return null;
   }
 
-  // Начинаем морской бой: атакующий флот «в пути», управляется через G.combat.
-  const defenderId = to.ownerId!;
-  from.fleets = 0;
-  from.ownerId = null;
-  G.combat = {
-    kind: 'naval', location: toId, fromId,
-    attackerId: pid, defenderId,
-    attackerUnits: moving, defenderUnits: to.fleets,
-    defenderBonus: navalDefenseBonus(G, toId, defenderId),
-    round: 0, lastRoll: null,
-  };
-  log(G, `${G.players[pid].name} атакует флот у ${to.name} (${moving} против ${to.fleets}).`);
+  to.fleets += take;
+  to.ownerId = pid;
+  log(G, `${G.players[pid].name}: флот ${take} → ${to.name}.`);
+  m.at = toId;
+  m.carrying = take;
+  m.stepsLeft -= 1;
+  if (m.stepsLeft <= 0) G.fleetMove = null; // дальше нельзя
+  return null;
+}
+
+/** Завершает приказ флоту досрочно (оставшиеся корабли стоят на текущей клетке). */
+export function endFleetMove(G: CycladesState, pid: PlayerID): string | null {
+  const m = G.fleetMove;
+  if (!m || m.playerId !== pid) return 'нет перемещения';
+  G.fleetMove = null;
   return null;
 }
 
