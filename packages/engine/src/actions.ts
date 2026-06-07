@@ -144,6 +144,22 @@ export function applyBuild(G: CycladesState, pid: string, god: GodName, islandId
   return null;
 }
 
+/**
+ * Установка рога изобилия первым выбравшим Аполлона: +1 к доходу выбранного
+ * своего острова. Возвращает текст ошибки или null при успехе (сбрасывает флаг).
+ */
+export function applyPlaceCornucopia(G: CycladesState, pid: string, islandId: TerritoryId): string | null {
+  if (G.pendingCornucopia !== pid) return 'сейчас не ваш рог изобилия';
+  const isl = G.territories[islandId];
+  if (!isl || !isIsland(isl) || isl.ownerId !== pid) return 'нужен свой остров';
+  isl.cornucopia += 1;
+  if (isl.cornucopiaSpots.length > 0) isl.cornucopiaSpots[0].count += 1;
+  else isl.cornucopiaSpots.push({ pos: { ...isl.cells[0].pos }, count: 1 });
+  G.pendingCornucopia = null;
+  log(G, `${G.players[pid].name} кладёт рог изобилия на ${isl.name} (Аполлон).`);
+  return null;
+}
+
 /** Завершает активацию текущего бога; продвигает очередь. Возвращает true, если фаза действий окончена. */
 export function advanceTurn(G: CycladesState): boolean {
   const s = G.actions;

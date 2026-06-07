@@ -185,6 +185,8 @@ export interface CycladesState {
   actions: ActionsState | null;
   /** Рынок мифических существ (общий, открытый). */
   creatures: CreatureMarket;
+  /** Игрок, который должен поставить рог изобилия (первый выбравший Аполлона). */
+  pendingCornucopia: PlayerID | null;
   log: LogEntry[];
 }
 

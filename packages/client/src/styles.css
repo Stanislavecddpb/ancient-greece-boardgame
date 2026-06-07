@@ -86,6 +86,9 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 .move-box button { background: #3a5a8a; padding: 2px 6px; font-size: 0.78rem; }
 .move-box input { border-radius: 5px; border: 1px solid #2a3f5a; background: #0f1b2a; color: #e8eef5; }
 .end-turn { background: #b3602f; }
+.action-bar.prosperity { border-color: #caa24f; box-shadow: 0 0 0 1px #caa24f55, 0 0 18px #caa24f33; }
+.action-bar.prosperity button { background: #b8902f; }
+.action-bar.prosperity button:disabled { opacity: 0.45; }
 
 /* лог */
 .log {

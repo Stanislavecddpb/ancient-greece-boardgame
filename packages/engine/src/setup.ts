@@ -74,6 +74,7 @@ export function setupGame(ctx: Ctx, random?: RandomAPI): CycladesState {
     auction: null,
     actions: null,
     creatures: createCreatureMarket(random?.Shuffle),
+    pendingCornucopia: null,
     log: [{ cycle: 1, text: 'Партия началась. Боги ждут подношений.' }],
   };
 }

@@ -26,11 +26,15 @@ describe('интеграция фаз через boardgame.io', () => {
     // Оба игрока уходят к Аполлону — простейший путь закрыть аукцион.
     client.moves.chooseApollo();
     client.moves.chooseApollo();
-    const { ctx, G } = client.getState()!;
-    // Конкурентных богов никто не взял → фаза действий мгновенно закрывает цикл,
-    // и игра возвращается к доходу/аукциону следующего цикла.
-    expect(G.cycle).toBe(2);
-    expect(ctx.phase === 'auction' || ctx.phase === 'income').toBe(true);
+    let s = client.getState()!;
+    // Конкурентных богов никто не взял, но первый «апполонец» должен поставить рог.
+    expect(s.G.pendingCornucopia).toBe('0');
+    expect(s.ctx.phase).toBe('actions');
+    client.moves.placeCornucopia('home_n');
+    s = client.getState()!;
+    // После установки рога цикл закрывается, игра идёт к следующему аукциону.
+    expect(s.G.cycle).toBe(2);
+    expect(s.ctx.phase).toBe('auction');
   });
 
   it('порядок действий — по позиции бога сверху вниз, Аполлон не ходит', () => {
@@ -42,12 +46,20 @@ describe('интеграция фаз через boardgame.io', () => {
     client.moves.chooseApollo();        // '2' → Аполлон
     client.moves.bidGod('poseidon', 1); // '3' → Посейдон (средний)
 
-    const s = client.getState()!;
+    let s = client.getState()!;
     expect(s.ctx.phase).toBe('actions');
     const order = s.G.actions!.queue.map((t) => `${t.god}:${t.playerId}`);
     // Сверху вниз: Арес('1'), Посейдон('3'), Зевс('0'). Аполлон('2') — вне очереди.
     expect(order).toEqual(['ares:1', 'poseidon:3', 'zeus:0']);
-    expect(s.ctx.currentPlayer).toBe('1'); // первым ходит подкупивший верхнего бога
+    // Сначала «апполонец» '2' ставит рог изобилия, и только потом ходят боги.
+    expect(s.G.pendingCornucopia).toBe('2');
+    expect(s.ctx.currentPlayer).toBe('2');
+    const isl2 = Object.values(s.G.territories).find((t) => t.kind === 'island' && t.ownerId === '2')!;
+    client.moves.placeCornucopia(isl2.id);
+
+    s = client.getState()!;
+    expect(s.G.pendingCornucopia).toBeNull();
+    expect(s.ctx.currentPlayer).toBe('1'); // первым из богов ходит подкупивший верхнего бога
   });
 
   it('победитель аукциона исполняет действия и завершает свой ход', () => {
@@ -59,6 +71,11 @@ describe('интеграция фаз через boardgame.io', () => {
     let s = client.getState()!;
     expect(s.ctx.phase).toBe('actions');
     expect(s.G.actions!.queue).toHaveLength(1);
+    // Сначала '1' (Аполлон) ставит рог изобилия, затем ходит '0' (Арес).
+    expect(s.ctx.currentPlayer).toBe('1');
+    const isl1 = Object.values(s.G.territories).find((t) => t.kind === 'island' && t.ownerId === '1')!;
+    client.moves.placeCornucopia(isl1.id);
+    s = client.getState()!;
     expect(s.ctx.currentPlayer).toBe('0');
 
     // '0' строит крепость на домашнем острове и завершает активацию.

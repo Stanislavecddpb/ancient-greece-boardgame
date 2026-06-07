@@ -124,13 +124,12 @@ export function resolveAuction(G: CycladesState, ctx: Ctx): void {
   }
 
   // Аполлон: контролирующий ≤1 остров получает 4 золота, иначе 1.
-  // Первый выбравший Аполлона дополнительно получает рог изобилия (TODO: класть на остров).
-  a.apollo.forEach((pid, idx) => {
+  // Установку рога изобилия первым выбравшим Аполлона делает фаза действий.
+  for (const pid of a.apollo) {
     const gold = islandsOf(G, pid).length <= 1 ? 4 : 1;
     G.players[pid].gold += gold;
-    const extra = idx === 0 ? ' (+рог изобилия)' : '';
-    log(G, `${G.players[pid].name} следует за Аполлоном (+${gold} золота${extra}).`);
-  });
+    log(G, `${G.players[pid].name} следует за Аполлоном (+${gold} золота).`);
+  }
   // Внимание: сам G.auction обнуляется вызывающей стороной ПОСЛЕ построения
   // очереди действий (startActionsPhase читает слоты).
 }

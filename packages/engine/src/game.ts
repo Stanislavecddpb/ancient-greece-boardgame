@@ -18,10 +18,11 @@ import {
   activePlayerId,
   applyRecruit,
   applyBuild,
+  applyPlaceCornucopia,
   advanceTurn,
   endCycle,
 } from './actions';
-import { metropolisCount } from './helpers';
+import { metropolisCount, islandsOf } from './helpers';
 import { applyBuyCreature, applyCycleCreatures } from './creatures';
 import { applyFleetMove, applyTroopMove } from './movement';
 import { dieFromRandom } from './combat';
@@ -54,6 +55,10 @@ export const CycladesGame: Game<CycladesState> = {
       endIf: ({ G, ctx }) => auctionComplete(G, ctx),
       onEnd: ({ G, ctx }) => {
         resolveAuction(G, ctx);
+        // Первый выбравший Аполлона ставит рог изобилия (если владеет островом).
+        const firstApollo = G.auction?.apollo[0] ?? null;
+        G.pendingCornucopia =
+          firstApollo && islandsOf(G, firstApollo).length > 0 ? firstApollo : null;
         startActionsPhase(G);
         G.auction = null;
       },
@@ -82,8 +87,8 @@ export const CycladesGame: Game<CycladesState> = {
     actions: {
       next: 'auction',
       onBegin: ({ G, ctx }) => {
-        if (!currentTurn(G)) {
-          // Никто не взял конкурентного бога (все ушли к Аполлону) — цикл закрыт.
+        if (!currentTurn(G) && !G.pendingCornucopia) {
+          // Никто не взял конкурентного бога и нет рога к установке — цикл закрыт.
           endCycle(G, ctx);
           G.actions = null;
         }
@@ -91,8 +96,9 @@ export const CycladesGame: Game<CycladesState> = {
       endIf: ({ G }) => G.actions === null,
       turn: {
         order: {
-          first: ({ G, ctx }) => posOf(ctx, activePlayerId(G)),
-          next: ({ G, ctx }) => posOf(ctx, activePlayerId(G)),
+          // Сначала ходит тот, кто ставит рог изобилия (Аполлон), затем очередь богов.
+          first: ({ G, ctx }) => posOf(ctx, G.pendingCornucopia ?? activePlayerId(G)),
+          next: ({ G, ctx }) => posOf(ctx, G.pendingCornucopia ?? activePlayerId(G)),
         },
       },
       moves: {
@@ -136,6 +142,18 @@ export const CycladesGame: Game<CycladesState> = {
           const turn = currentTurn(G);
           if (!turn || turn.playerId !== playerID || turn.god !== 'zeus') return INVALID_MOVE;
           if (applyCycleCreatures(G, playerID!)) return INVALID_MOVE;
+        },
+
+        // Аполлон: первый выбравший кладёт рог изобилия на свой остров.
+        placeCornucopia: ({ G, ctx, playerID, events }, islandId: TerritoryId) => {
+          if (applyPlaceCornucopia(G, playerID!, islandId)) return INVALID_MOVE;
+          if (!currentTurn(G)) {
+            // Конкурентных богов никто не взял — после установки рога цикл закрыт.
+            endCycle(G, ctx);
+            G.actions = null;
+          } else {
+            events.endTurn();
+          }
         },
 
         endGod: ({ G, ctx, playerID, events }) => {

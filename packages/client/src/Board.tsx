@@ -56,7 +56,7 @@ function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: an
     return <div className="gameover"><h1>🏆 Победа: {w?.name}!</h1></div>;
   }
 
-  const activeId = G.auction ? G.auction.toAct : activePlayerId(G);
+  const activeId = G.pendingCornucopia ?? (G.auction ? G.auction.toAct : activePlayerId(G));
 
   return (
     <div className="game">
@@ -64,9 +64,15 @@ function GameView({ G, ctx, moves, me }: { G: CycladesState; ctx: any; moves: an
         <BoardMap G={G} me={me} selected={selected} onSelect={setSelected} />
         <PlayersCorners G={G} ctx={ctx} activeId={activeId} me={me} />
         <div className="phase-tag">Цикл {G.cycle} · {phaseLabel(ctx.phase)}</div>
-        {ctx.phase === 'actions' && (
+        {ctx.phase === 'actions' && G.pendingCornucopia ? (
+          G.pendingCornucopia === me ? (
+            <ProsperityPrompt G={G} me={me} moves={moves} selected={selected} />
+          ) : (
+            <div className="action-bar"><div className="ab-title">☀️ {G.players[G.pendingCornucopia].name} кладёт рог изобилия…</div></div>
+          )
+        ) : ctx.phase === 'actions' ? (
           <ActionBar G={G} me={me} moves={moves} selected={selected} />
-        )}
+        ) : null}
         <EventLog G={G} />
       </div>
       <GodBoard G={G} ctx={ctx} me={me} moves={moves} />
@@ -161,6 +167,22 @@ function ActionBar({ G, me, moves, selected }: {
           <button className="end-turn" onClick={() => moves.endGod()}>Завершить →</button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProsperityPrompt({ G, me, moves, selected }: {
+  G: CycladesState; me: string | null; moves: any; selected: TerritoryId | null;
+}) {
+  const sel = selected ? G.territories[selected] : null;
+  const ok = !!sel && isIsland(sel) && sel.ownerId === me;
+  return (
+    <div className="action-bar prosperity">
+      <div className="ab-title">☀️ Аполлон: положите рог изобилия на свой остров (+1 к доходу)</div>
+      <div className="ab-controls">
+        <span className="sel-hint">{sel ? sel.name : 'кликните свой остров на карте'}</span>
+        <button disabled={!ok} onClick={() => moves.placeCornucopia(selected)}>🌽 Положить рог</button>
+      </div>
     </div>
   );
 }
