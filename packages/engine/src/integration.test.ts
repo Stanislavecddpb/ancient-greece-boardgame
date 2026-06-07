@@ -33,6 +33,23 @@ describe('интеграция фаз через boardgame.io', () => {
     expect(ctx.phase === 'auction' || ctx.phase === 'income').toBe(true);
   });
 
+  it('порядок действий — по позиции бога сверху вниз, Аполлон не ходит', () => {
+    const client = makeClient(4);
+    // Боги цикла 1 при 4 игроках: ares, poseidon, zeus (3 конкурентных) + Аполлон.
+    // Игроки берут их «вперемешку», но очередь должна выстроиться по порядку богов.
+    client.moves.bidGod('zeus', 1);     // '0' → Зевс (нижний из конкурентных)
+    client.moves.bidGod('ares', 1);     // '1' → Арес (верхний)
+    client.moves.chooseApollo();        // '2' → Аполлон
+    client.moves.bidGod('poseidon', 1); // '3' → Посейдон (средний)
+
+    const s = client.getState()!;
+    expect(s.ctx.phase).toBe('actions');
+    const order = s.G.actions!.queue.map((t) => `${t.god}:${t.playerId}`);
+    // Сверху вниз: Арес('1'), Посейдон('3'), Зевс('0'). Аполлон('2') — вне очереди.
+    expect(order).toEqual(['ares:1', 'poseidon:3', 'zeus:0']);
+    expect(s.ctx.currentPlayer).toBe('1'); // первым ходит подкупивший верхнего бога
+  });
+
   it('победитель аукциона исполняет действия и завершает свой ход', () => {
     const client = makeClient(2);
     // '0' берёт Ареса, '1' уходит к Аполлону → в очереди действий только '0'.
