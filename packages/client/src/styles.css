@@ -90,6 +90,14 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 .action-bar.prosperity button { background: #b8902f; }
 .action-bar.prosperity button:disabled { opacity: 0.45; }
 
+/* стрелки перемещения */
+.mv-target { fill: #ffd76a; opacity: 0.16; }
+.mv-arrow:hover .mv-target { opacity: 0.36; }
+.mv-line { stroke: #ffd76a; stroke-width: 4.5; stroke-linecap: round; }
+.mv-head { fill: #ffd76a; }
+.mv-arrow { animation: mvpulse 1.3s ease-in-out infinite; }
+@keyframes mvpulse { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+
 /* лог */
 .log {
   position: absolute; bottom: 10px; left: 10px; z-index: 8; max-width: 320px;

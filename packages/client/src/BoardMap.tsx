@@ -14,11 +14,19 @@ import {
 import { SvgDefs } from './art/SvgDefs';
 import { Trireme, Hoplite, BuildingGlyph, Metropolis, CoinStack, ControlToken } from './art/pieces';
 
+/** Активное перемещение: откуда, куда можно и что делать при клике по цели. */
+export interface MovementCtx {
+  from: TerritoryId;
+  targets: TerritoryId[];
+  onMove: (to: TerritoryId) => void;
+}
+
 interface Props {
   G: CycladesState;
   me: string | null;
   selected: TerritoryId | null;
   onSelect: (id: TerritoryId) => void;
+  movement?: MovementCtx | null;
 }
 
 const SEA_R = CELL_D * 0.46;
@@ -45,7 +53,7 @@ function offsets(n: number, kind: 'troop' | 'fleet'): Array<{ x: number; y: numb
   return [{ x: -13, y: -9 }, { x: 13, y: -9 }, { x: -13, y: 9 }, { x: 13, y: 9 }];
 }
 
-export function BoardMap({ G, me, selected, onSelect }: Props) {
+export function BoardMap({ G, me, selected, onSelect, movement }: Props) {
   const territories = Object.values(G.territories);
   const islands = territories.filter(isIsland);
   const seas = territories.filter(isSea);
@@ -61,7 +69,43 @@ export function BoardMap({ G, me, selected, onSelect }: Props) {
       {islands.map((isl) => (
         <IslandNode key={isl.id} isl={isl} G={G} me={me} selected={selected === isl.id} color={colorOf(isl.ownerId)} onSelect={onSelect} />
       ))}
+      {movement && <MovementLayer G={G} movement={movement} />}
     </svg>
+  );
+}
+
+/** Стрелки от выбранной фишки к доступным клеткам; клик по цели — ход. */
+function MovementLayer({ G, movement }: { G: CycladesState; movement: MovementCtx }) {
+  const src = G.territories[movement.from];
+  if (!src) return null;
+  const from = src.pos;
+  return (
+    <g>
+      {movement.targets.map((id) => {
+        const t = G.territories[id];
+        if (!t) return null;
+        return <MoveArrow key={id} from={from} to={t.pos} onMove={() => movement.onMove(id)} />;
+      })}
+    </g>
+  );
+}
+
+function MoveArrow({ from, to, onMove }: {
+  from: { x: number; y: number }; to: { x: number; y: number }; onMove: () => void;
+}) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const sx = from.x + ux * 28, sy = from.y + uy * 28;
+  const ex = to.x - ux * 30, ey = to.y - uy * 30;
+  const hl = { x: ex - ux * 13 - uy * 8, y: ey - uy * 13 + ux * 8 };
+  const hr = { x: ex - ux * 13 + uy * 8, y: ey - uy * 13 - ux * 8 };
+  return (
+    <g className="mv-arrow" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onMove(); }}>
+      <circle cx={to.x} cy={to.y} r={SEA_R} className="mv-target" />
+      <line x1={sx} y1={sy} x2={ex} y2={ey} className="mv-line" />
+      <polygon points={`${ex},${ey} ${hl.x},${hl.y} ${hr.x},${hr.y}`} className="mv-head" />
+    </g>
   );
 }
 
