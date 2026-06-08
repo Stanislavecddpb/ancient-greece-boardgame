@@ -60,9 +60,9 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
   align-items: center; justify-content: center; gap: 1.6vh; padding: 1vh 8px;
 }
 .market-title { font-size: 0.85rem; font-weight: 700; color: #cdbf9d; letter-spacing: 0.5px; }
-.mk-row { display: flex; align-items: center; gap: 8px; }
+.mk-row { display: flex; align-items: center; gap: 6px; width: 100%; justify-content: center; }
 .mk-card {
-  width: min(100%, 20vh); aspect-ratio: 0.66 / 1; position: relative; border-radius: 10px;
+  width: min(58%, 17vh); aspect-ratio: 0.66 / 1; position: relative; border-radius: 10px;
   border: 2px solid #6a5424; overflow: hidden; background: linear-gradient(160deg, #2a2412, #14100a);
   box-shadow: 0 3px 10px #0007; flex-shrink: 0;
 }
@@ -76,12 +76,12 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 /* цена существа — столбик монет-картинок по числу позиции (4/3/2) */
 .mk-coins { display: flex; flex-direction: column; align-items: center; }
 .mk-coin {
-  width: clamp(44px, 4vw, 60px); aspect-ratio: 1 / 1;
+  width: 6vw; min-width: 60px; max-width: 104px; aspect-ratio: 1 / 1; flex-shrink: 0;
   background: url('/icons/coin.png') center/contain no-repeat;
   filter: drop-shadow(0 1px 2px #0008);
 }
-/* лёгкий нахлёст, чтобы 4 монеты влезли по высоте карты */
-.mk-coin + .mk-coin { margin-top: -14px; }
+/* стопкой с нахлёстом, чтобы крупные монеты влезли по высоте карты */
+.mk-coin + .mk-coin { margin-top: -4vw; }
 .mk-empty { opacity: 0.6; font-size: 0.8rem; }
 
 /* ===== Лобби (ожидание старта) ===== */
