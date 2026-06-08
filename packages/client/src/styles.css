@@ -83,6 +83,8 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 /* стопкой с нахлёстом, чтобы крупные монеты влезли по высоте карты */
 .mk-coin + .mk-coin { margin-top: -4vw; }
 .mk-empty { opacity: 0.6; font-size: 0.8rem; }
+.mk-back { border-color: #3a4a6a; }
+.mk-back .mk-img { opacity: 0.95; }
 
 /* ===== Лобби (ожидание старта) ===== */
 .lobby { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center;

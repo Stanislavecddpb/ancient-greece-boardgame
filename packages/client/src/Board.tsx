@@ -258,7 +258,7 @@ function MarketColumn({ G }: { G: CycladesState; me: string | null }) {
       <div className="market-title">Существа</div>
       {market.map((id, i) => (
         <div className="mk-row" key={i}>
-          <CreatureCard def={CREATURES[id]} />
+          {id ? <CreatureCard def={CREATURES[id]} /> : <CardbackCard />}
           <div className="mk-coins" title={`${CREATURE_SLOT_PRICES[i]} золота`}>
             {Array.from({ length: CREATURE_SLOT_PRICES[i] ?? 2 }, (_, k) => (
               <span key={k} className="mk-coin" />
@@ -281,6 +281,20 @@ function CreatureCard({ def }: { def: CreatureDef }) {
         <div className="mk-art"><span className="mk-emblem">{def.emblem}</span></div>
       )}
       <div className="mk-name">{def.name}</div>
+    </div>
+  );
+}
+
+/** Пустой (купленный) слот — рубашка картой вверх. */
+function CardbackCard() {
+  const [imgOk, setImgOk] = useState(true);
+  return (
+    <div className="mk-card mk-back" title="слот пуст — существо придёт при прокрутке">
+      {imgOk ? (
+        <img className="mk-img" src="/creatures/cardback_vertical.jpg" alt="рубашка" onError={() => setImgOk(false)} />
+      ) : (
+        <div className="mk-art"><span className="mk-emblem">🂠</span></div>
+      )}
     </div>
   );
 }
@@ -449,6 +463,7 @@ function CreatureButtons({ G, pid, moves, sel, selected, god, s }: {
   return (
     <span className="creature-buy">
       {market.map((id, i) => {
+        if (!id) return null; // пустой слот (рубашка) — покупать нечего
         const d = CREATURES[id];
         const cost = creaturePriceAt(G, pid, i); // цена по позиции слота
         const needsTarget = d.target !== 'none';

@@ -86,7 +86,7 @@ describe('сдвиг рынка', () => {
 });
 
 describe('покупка существ', () => {
-  it('покупка снизу (за 2): купленное в сброс, остальные дешевеют, сверху новое', () => {
+  it('покупка снизу (за 2): купленное в сброс, слот — рубашкой (null), без сдвига', () => {
     const G = withMarket(['a', 'b', 'minotaur'], ['d']); // minotaur снизу (за 2), цель — остров
     G.players['0'].gold = 9;
     const isl = G.territories['home_n'];
@@ -94,8 +94,11 @@ describe('покупка существ', () => {
     const gold0 = G.players['0'].gold;
     expect(applyBuyCreature(G, '0', 2, 'home_n')).toBeNull();
     expect(G.players['0'].gold).toBe(gold0 - 2); // нижний слот — 2
-    expect(G.creatures.market).toEqual(['d', 'a', 'b']);
+    expect(G.creatures.market).toEqual(['a', 'b', null]); // слот пуст, остальные на месте
     expect(G.creatures.discard).toContain('minotaur');
+    // прокрутка заполняет: верхнее съезжает вниз, сверху новое из колоды
+    advanceCreatureMarket(G.creatures);
+    expect(G.creatures.market).toEqual(['d', 'a', 'b']);
   });
 
   it('Грифон сверху стоит 4 и крадёт половину золота', () => {

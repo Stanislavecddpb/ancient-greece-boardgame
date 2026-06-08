@@ -197,8 +197,8 @@ export interface FleetMoveState {
 export interface CreatureMarket {
   /** Колода рубашкой вверх (берём с начала). */
   deck: string[];
-  /** Открытые существа (до 3) — доступны к покупке. */
-  market: string[];
+  /** Открытые слоты (3): id существа или null (купленный слот — рубашкой вверх). */
+  market: (string | null)[];
   /** Сброшенные/использованные существа. */
   discard: string[];
 }

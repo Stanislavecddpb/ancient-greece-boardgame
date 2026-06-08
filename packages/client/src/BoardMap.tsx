@@ -36,9 +36,20 @@ const SHOW_PIECES = true;
 
 const seatOf = (pid: string) => Number(pid);
 
+// ===== Размеры и расположение фишек на клетке — МЕНЯТЬ ЗДЕСЬ =====
+// Размер здания (≈ четверть–половина клетки). CELL_D — размер клетки.
+const BUILD_SIZE = CELL_D * 0.5;     // картинка здания, px
+const METRO_SIZE = CELL_D * 0.66;    // картинка Метрополии, px
+const TROOP_SCALE = 1.5;             // масштаб солдата (войска — снизу справа)
+const TROOP_OVERLAP = 12;            // насколько солдаты «заезжают» друг на друга, px
+const TROOP_MAX_SHOWN = 5;           // сколько фигур солдат показывать, дальше — счётчик
+// Якорь солдат относительно центра острова (низ-право):
+const TROOP_AX = LAND_R * 0.5;
+const TROOP_AY = LAND_R * 0.5;
+// ================================================================
+
 /** Масштаб фигур в зависимости от их числа в клетке (меньше фишек — крупнее). */
 const fleetScale = (n: number) => (n <= 1 ? 1.05 : n === 2 ? 0.85 : 0.68);
-const troopScale = (n: number) => (n <= 1 ? 1.6 : n === 2 ? 1.35 : 1.15);
 
 /** Смещения для размещения n фишек в клетке. */
 function offsets(n: number, kind: 'troop' | 'fleet'): Array<{ x: number; y: number }> {
@@ -204,25 +215,26 @@ function IslandNode({ isl, G, me, selected, color, onSelect }: {
         </g>
       )}
 
-      {SHOW_PIECES && (isl.hasMetropolis ? (
-        <g transform={`translate(${isl.pos.x} ${isl.pos.y - 2})`}><Metropolis /></g>
-      ) : (
-        isl.buildings.map((b, i) => {
-          const n = isl.buildings.length;
-          const bx = isl.pos.x + (i - (n - 1) / 2) * 22;
-          return <g key={i} transform={`translate(${bx} ${isl.pos.y - LAND_R * 0.1}) scale(1.15)`}><BuildingGlyph type={b.type} /></g>;
-        })
-      ))}
+      {/* здания — в центре своей клетки; Метрополия — в центре острова (могут сосуществовать) */}
+      {SHOW_PIECES && isl.buildings.map((b, i) => {
+        const cell = isl.cells[i % isl.cells.length].pos;
+        return <g key={i} transform={`translate(${cell.x} ${cell.y})`}><BuildingGlyph type={b.type} size={BUILD_SIZE} /></g>;
+      })}
+      {SHOW_PIECES && isl.hasMetropolis && (
+        <g transform={`translate(${isl.pos.x} ${isl.pos.y})`}><Metropolis size={METRO_SIZE} /></g>
+      )}
 
-      {/* войска (до 3 фигур + счётчик) */}
+      {/* войска — снизу справа, стопкой (нижние спереди), при избытке — счётчик */}
       {SHOW_PIECES && isl.troops > 0 && isl.ownerId && (
         <g>
-          {offsets(Math.min(isl.troops, 3), 'troop').map((o, i) => (
-            <g key={i} transform={`translate(${isl.pos.x + o.x} ${isl.pos.y + LAND_R * 0.3 + o.y}) scale(${troopScale(isl.troops)})`}>
+          {Array.from({ length: Math.min(isl.troops, TROOP_MAX_SHOWN) }, (_, i) => Math.min(isl.troops, TROOP_MAX_SHOWN) - 1 - i).map((i) => (
+            <g key={i} transform={`translate(${isl.pos.x + TROOP_AX} ${isl.pos.y + TROOP_AY - i * TROOP_OVERLAP}) scale(${TROOP_SCALE})`}>
               <Hoplite color={G.players[isl.ownerId!].color} variant={seatOf(isl.ownerId!)} />
             </g>
           ))}
-          {isl.troops > 3 && <Badge x={isl.pos.x + 24} y={isl.pos.y + LAND_R * 0.42 - 14} text={isl.troops} />}
+          {isl.troops > TROOP_MAX_SHOWN && (
+            <Badge x={isl.pos.x + TROOP_AX + 13} y={isl.pos.y + TROOP_AY - TROOP_MAX_SHOWN * TROOP_OVERLAP} text={isl.troops} />
+          )}
         </g>
       )}
 

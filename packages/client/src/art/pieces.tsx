@@ -109,8 +109,8 @@ export function ControlToken({ color }: { color: string }) {
 }
 
 /** Здание заданного типа: иконка из /icons/<type>.png с откатом к рисованному. */
-export function BuildingGlyph({ type }: { type: BuildingType }) {
-  return <SvgIcon href={`/icons/${type}.png`} size={22} fallback={buildingFallback(type)} />;
+export function BuildingGlyph({ type, size = 22 }: { type: BuildingType; size?: number }) {
+  return <SvgIcon href={`/icons/${type}.png`} size={size} fallback={buildingFallback(type)} />;
 }
 
 function buildingFallback(type: BuildingType): ReactElement {
@@ -155,8 +155,8 @@ function buildingFallback(type: BuildingType): ReactElement {
 }
 
 /** Метрополия: иконка из /icons/metropolis.png с откатом к рисованному храму. */
-export function Metropolis() {
-  return <SvgIcon href="/icons/metropolis.png" size={34} fallback={metropolisFallback()} />;
+export function Metropolis({ size = 34 }: { size?: number }) {
+  return <SvgIcon href="/icons/metropolis.png" size={size} fallback={metropolisFallback()} />;
 }
 
 function metropolisFallback(): ReactElement {

@@ -313,10 +313,10 @@ function drawCard(c: CreatureMarket): string | undefined {
 export function advanceCreatureMarket(c: CreatureMarket): void {
   if (c.market.length >= 3) {
     const bottom = c.market.pop();
-    if (bottom) c.discard.push(bottom);
+    if (bottom) c.discard.push(bottom); // пустой (null) слот просто исчезает снизу
   }
-  const next = drawCard(c);
-  if (next) c.market.unshift(next);
+  // Сверху открывается новое существо (или рубашка, если колода и сброс пусты).
+  c.market.unshift(drawCard(c) ?? null);
 }
 
 /** Добирает рынок до 3 открытых существ (на старте партии). */
@@ -377,12 +377,11 @@ export function applyBuyCreature(
 
   G.players[pid].gold -= cost;
   s.creatureBought = true;
-  // Купленное уходит в сброс, дороже него сдвигаются к дешёвой стороне,
-  // сверху (за 4) открывается новое существо.
-  G.creatures.market.splice(slotIndex, 1);
+  // Купленное уходит в сброс, слот остаётся пустым (рубашкой вверх) и НЕ
+  // сдвигается. Существо в этот слот придёт при следующей прокрутке (конец
+  // хода или Зевс) — туда сдвинется верхнее существо.
   G.creatures.discard.push(id);
-  const next = drawCard(G.creatures);
-  if (next) G.creatures.market.unshift(next);
+  G.creatures.market[slotIndex] = null;
   log(G, `${G.players[pid].name} призывает: ${def.name} (−${cost}🪙). ${def.desc}.`);
   return null;
 }
