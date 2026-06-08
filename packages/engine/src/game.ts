@@ -24,8 +24,8 @@ import {
 } from './actions';
 import { metropolisCount, islandsOf, log } from './helpers';
 import { applyBuildMetropolis } from './metropolis';
-import { applyBuyCreature, applyCycleCreatures, expireBoardCreatures } from './creatures';
-import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat } from './movement';
+import { applyBuyCreature, applyCycleCreatures, expireBoardCreatures, applySellUnits } from './creatures';
+import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, endSylph } from './movement';
 import { dieFromRandom } from './combat';
 import type { TerritoryId as TId } from './types';
 
@@ -191,6 +191,20 @@ export const CycladesGame: Game<CycladesState> = {
           const turn = currentTurn(G);
           if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID || turn.god !== 'zeus') return INVALID_MOVE;
           if (applyCycleCreatures(G, playerID!)) return INVALID_MOVE;
+        },
+
+        // Сфинкс: распродажа выбранного числа юнитов.
+        sellUnits: ({ G, playerID }, fleets: number, troops: number, priests: number, philosophers: number) => {
+          if (applySellUnits(G, playerID!, fleets, troops, priests, philosophers)) return INVALID_MOVE;
+        },
+
+        // Сильфида: шаг движения флота (1 корабль в соседнюю клетку).
+        sylphStep: ({ G, playerID }, fromId: TId, toId: TId) => {
+          if (applySylphStep(G, playerID!, fromId, toId)) return INVALID_MOVE;
+        },
+        // Сильфида: завершить движение досрочно.
+        endSylph: ({ G, playerID }) => {
+          if (endSylph(G, playerID!)) return INVALID_MOVE;
         },
 
         // Аполлон: первый выбравший кладёт рог изобилия на свой остров.

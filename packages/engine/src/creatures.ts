@@ -176,37 +176,13 @@ export const CREATURES: Record<string, CreatureDef> = {
   },
   sphinx: {
     id: 'sphinx', name: 'Сфинкс', emblem: '🦁', cost: 2, target: 'none',
-    desc: 'Продайте все свои войска/флот/жрецов/философов по 2 золота',
-    apply: (G, pid) => {
-      const p = G.players[pid];
-      let n = 0;
-      for (const t of Object.values(G.territories)) {
-        if (isSea(t) && t.ownerId === pid && t.fleets > 0) {
-          n += t.fleets; p.fleetsSupply = Math.min(UNIT_SUPPLY, p.fleetsSupply + t.fleets);
-          t.fleets = 0; t.ownerId = null;
-        }
-        if (isIsland(t) && t.ownerId === pid && t.troops > 0) {
-          n += t.troops; p.troopsSupply = Math.min(UNIT_SUPPLY, p.troopsSupply + t.troops);
-          t.troops = 0; // остров остаётся под контролем (жетон)
-        }
-      }
-      n += p.priests + p.philosophers;
-      p.priests = 0; p.philosophers = 0;
-      p.gold += n * 2;
-      return null;
-    },
+    desc: 'Распродать своих юнитов по 2 золота — выбрать что и сколько',
+    apply: (G, pid) => { G.sphinxResell = pid; return null; },
   },
   sylph: {
-    id: 'sylph', name: 'Сильфида', emblem: '🌬️', cost: 2, target: 'own-sea',
-    desc: 'Поставьте корабль в свою морскую зону',
-    apply: (G, pid, tid) => {
-      const p = G.players[pid];
-      if (p.fleetsSupply <= 0) return 'нет фигурок флота в запасе';
-      const sea = G.territories[tid!];
-      if (!isSea(sea)) return 'нужна морская зона';
-      sea.fleets += 1; sea.ownerId = pid; p.fleetsSupply -= 1;
-      return null;
-    },
+    id: 'sylph', name: 'Сильфида', emblem: '🌬️', cost: 2, target: 'none',
+    desc: 'Двигать свой флот суммарно на 10 клеток (по 1 кораблю за шаг)',
+    apply: (G, pid) => { G.sylphMove = { playerId: pid, stepsLeft: 10 }; return null; },
   },
   // === Фигурные существа: ставятся на доску, эффект через присутствие ===
   chiron: {
@@ -409,6 +385,50 @@ export function applyBuyCreature(
   G.creatures.discard.push(id);
   G.creatures.market[slotIndex] = null;
   log(G, `${G.players[pid].name} призывает: ${def.name} (−${cost}🪙). ${def.desc}.`);
+  return null;
+}
+
+/** Сфинкс: распродажа выбранного числа юнитов по 2 золота. Закрывает режим. */
+export function applySellUnits(
+  G: CycladesState, pid: PlayerID, fleets: number, troops: number, priests: number, philosophers: number,
+): string | null {
+  if (G.sphinxResell !== pid) return 'сейчас не ваша распродажа';
+  const p = G.players[pid];
+  const clamp = (n: number, max: number) => Math.max(0, Math.min(Math.floor(n || 0), max));
+
+  let availFleets = 0, availTroops = 0;
+  for (const t of Object.values(G.territories)) {
+    if (isSea(t) && t.ownerId === pid) availFleets += t.fleets;
+    if (isIsland(t) && t.ownerId === pid) availTroops += t.troops;
+  }
+  fleets = clamp(fleets, availFleets);
+  troops = clamp(troops, availTroops);
+  priests = clamp(priests, p.priests);
+  philosophers = clamp(philosophers, p.philosophers);
+
+  let f = fleets;
+  for (const t of Object.values(G.territories)) {
+    if (f <= 0) break;
+    if (isSea(t) && t.ownerId === pid && t.fleets > 0) {
+      const take = Math.min(f, t.fleets); t.fleets -= take; f -= take;
+      p.fleetsSupply = Math.min(UNIT_SUPPLY, p.fleetsSupply + take);
+      if (t.fleets === 0) t.ownerId = null;
+    }
+  }
+  let tr = troops;
+  for (const t of Object.values(G.territories)) {
+    if (tr <= 0) break;
+    if (isIsland(t) && t.ownerId === pid && t.troops > 0) {
+      const take = Math.min(tr, t.troops); t.troops -= take; tr -= take;
+      p.troopsSupply = Math.min(UNIT_SUPPLY, p.troopsSupply + take);
+    }
+  }
+  p.priests -= priests;
+  p.philosophers -= philosophers;
+  const total = fleets + troops + priests + philosophers;
+  p.gold += total * 2;
+  G.sphinxResell = null;
+  if (total > 0) log(G, `${p.name} распродаёт юнитов: ${total} (+${total * 2}🪙).`);
   return null;
 }
 

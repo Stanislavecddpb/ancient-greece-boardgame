@@ -10,6 +10,7 @@ import {
   applyCycleCreatures,
   placeBoardCreature,
   expireBoardCreatures,
+  applySellUnits,
 } from './creatures';
 import type { CycladesState } from './types';
 
@@ -162,6 +163,20 @@ describe('фигуры существ на доске', () => {
     expect(sea.ownerId).toBeNull();
     expect(G.players['1'].fleetsSupply).toBe(2);
     expect(G.boardCreatures.some((c) => c.kind === 'kraken' && c.location === sea.id)).toBe(true);
+  });
+
+  it('Сфинкс: покупка открывает распродажу, sellUnits продаёт выбранное по 2🪙', () => {
+    const G = withMarket(['sphinx', 'a', 'b']);
+    G.players['0'].gold = 9;
+    expect(applyBuyCreature(G, '0', 0)).toBeNull();
+    expect(G.sphinxResell).toBe('0');
+    G.players['0'].priests = 2; G.players['0'].philosophers = 1;
+    const gold0 = G.players['0'].gold;
+    expect(applySellUnits(G, '0', 0, 0, 1, 1)).toBeNull(); // продать 1 жреца + 1 философа
+    expect(G.players['0'].priests).toBe(1);
+    expect(G.players['0'].philosophers).toBe(0);
+    expect(G.players['0'].gold).toBe(gold0 + 4); // 2 юнита × 2
+    expect(G.sphinxResell).toBeNull();
   });
 
   it('Хирон защищает остров от Гиганта/Гарпии', () => {

@@ -102,7 +102,14 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
   const sel = selected ? G.territories[selected] : null;
   const canAct = ctx.phase === 'actions' && !G.pendingCornucopia && !!turn && activePlayerId(G) === me;
   let movement: MovementCtx | null = null;
-  if (canAct && me && G.fleetMove && G.fleetMove.playerId === me) {
+  if (canAct && me && G.sylphMove && G.sylphMove.playerId === me && sel && isSea(sel) && sel.ownerId === me && sel.fleets > 0) {
+    // Сильфида: выбран свой флот — стрелки в соседние свои/пустые клетки, по 1 кораблю.
+    const targets = sel.adjacentSeas.filter((id) => {
+      const t = G.territories[id];
+      return isSea(t) && !(t.fleets > 0 && t.ownerId !== me);
+    });
+    if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.sylphStep(sel.id, to); setSelected(to); } };
+  } else if (canAct && me && G.fleetMove && G.fleetMove.playerId === me) {
     // Идёт приказ флоту: стрелки в соседние клетки от текущей позиции группы.
     const at = G.territories[G.fleetMove.at];
     const carrying = G.fleetMove.carrying;
@@ -129,6 +136,10 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
           <CombatPanel G={G} me={me} moves={moves} />
         ) : G.fleetMove && G.fleetMove.playerId === me ? (
           <FleetMovePanel G={G} moves={moves} take={fleetTake} setTake={setFleetTake} />
+        ) : G.sylphMove && G.sylphMove.playerId === me ? (
+          <SylphPanel G={G} moves={moves} />
+        ) : G.sphinxResell === me ? (
+          <SphinxPanel G={G} me={me} moves={moves} />
         ) : ctx.phase === 'actions' && G.pendingCornucopia ? (
           G.pendingCornucopia === me ? (
             <ProsperityPrompt G={G} me={me} moves={moves} selected={selected} />
@@ -434,6 +445,56 @@ function FleetMovePanel({ G, moves, take, setTake }: {
           onChange={(e) => setTake(Math.max(1, Math.min(carrying, Number(e.target.value))))} style={{ width: 44 }} />
         <span className="sel-hint">→ кликните стрелку (оставшиеся {carrying - eff} высадятся здесь)</span>
         <button className="end-turn" onClick={() => moves.endFleetMove()}>Завершить движение</button>
+      </div>
+    </div>
+  );
+}
+
+/** Сильфида: движение флота на N клеток (по 1 кораблю за шаг). */
+function SylphPanel({ G, moves }: { G: CycladesState; moves: any }) {
+  return (
+    <div className="action-bar fleetmove">
+      <div className="ab-title">🌬️ Сильфида: движение флота · осталось клеток: {G.sylphMove!.stepsLeft}</div>
+      <div className="ab-controls">
+        <span className="sel-hint">выберите свой флот, кликайте стрелку (1 корабль = 1 клетка)</span>
+        <button className="end-turn" onClick={() => moves.endSylph()}>Готово</button>
+      </div>
+    </div>
+  );
+}
+
+/** Сфинкс: выбор, сколько каких юнитов продать (по 2🪙). */
+function SphinxPanel({ G, me, moves }: { G: CycladesState; me: string | null; moves: any }) {
+  const [f, setF] = useState(0);
+  const [t, setT] = useState(0);
+  const [pr, setPr] = useState(0);
+  const [ph, setPh] = useState(0);
+  let fleets = 0, troops = 0;
+  for (const terr of Object.values(G.territories)) {
+    if (isSea(terr) && terr.ownerId === me) fleets += terr.fleets;
+    if (isIsland(terr) && terr.ownerId === me) troops += terr.troops;
+  }
+  const pl = G.players[me!];
+  const clamp = (v: number, max: number) => Math.max(0, Math.min(v, max));
+  const ef = clamp(f, fleets), et = clamp(t, troops), epr = clamp(pr, pl.priests), eph = clamp(ph, pl.philosophers);
+  const total = ef + et + epr + eph;
+  const num = (val: number, set: (n: number) => void, max: number, label: string) => (
+    <span className="move-box">
+      <span>{label} (есть {max}):</span>
+      <input type="number" min={0} max={max} value={Math.min(val, max)} style={{ width: 40 }}
+        onChange={(e) => set(clamp(Number(e.target.value), max))} />
+    </span>
+  );
+  return (
+    <div className="action-bar sphinx">
+      <div className="ab-title">🦁 Сфинкс: распродать своих юнитов (по 2🪙)</div>
+      <div className="ab-controls">
+        {num(f, setF, fleets, '⛵ флот')}
+        {num(t, setT, troops, '⚔️ войска')}
+        {num(pr, setPr, pl.priests, '⚜️ жрецы')}
+        {num(ph, setPh, pl.philosophers, '📜 философы')}
+        <span className="sel-hint">итого +{total * 2}🪙</span>
+        <button className="end-turn" onClick={() => moves.sellUnits(ef, et, epr, eph)}>Продать / Готово</button>
       </div>
     </div>
   );

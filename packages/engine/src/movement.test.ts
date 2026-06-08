@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Ctx } from 'boardgame.io';
 import { setupGame } from './setup';
-import { startFleetMove, hopFleet, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat } from './movement';
+import { startFleetMove, hopFleet, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep } from './movement';
 import { placeBoardCreature } from './creatures';
 import { isSea, isIsland } from './board';
 import type { CycladesState, Sea } from './types';
@@ -211,6 +211,19 @@ describe('фигуры существ в движении', () => {
     placeBoardCreature(G, 'kraken', '1', bId);
     startFleetMove(G, '0', a.id);
     expect(hopFleet(G, '0', bId, 1)).toBe('зона закрыта (Кракен/Полифем)');
+  });
+
+  it('Сильфида двигает по 1 кораблю и тратит бюджет', () => {
+    const G = setupGame(ctxFor(2));
+    G.sylphMove = { playerId: '0', stepsLeft: 10 };
+    const a = freshSeas(G).find((s) => s.adjacentSeas.some((nb) => { const t = G.territories[nb]; return isSea(t) && t.fleets === 0; }))!;
+    const bId = a.adjacentSeas.find((nb) => { const t = G.territories[nb]; return isSea(t) && t.fleets === 0; })!;
+    const bSea = G.territories[bId] as Sea;
+    a.ownerId = '0'; a.fleets = 2;
+    expect(applySylphStep(G, '0', a.id, bId)).toBeNull();
+    expect(bSea.fleets).toBe(1);
+    expect(a.fleets).toBe(1);
+    expect(G.sylphMove!.stepsLeft).toBe(9);
   });
 
   it('Полифем не пускает флот в соседние зоны своего острова', () => {

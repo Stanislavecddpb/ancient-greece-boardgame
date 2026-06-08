@@ -207,6 +207,20 @@ export interface BoardCreature {
   placedCycle: number;
 }
 
+/** Сильфида: бесплатное движение флота суммарно на N клеток (по 1 кораблю за шаг). */
+export interface SylphMoveState {
+  playerId: PlayerID;
+  /** Сколько клеток-перемещений ещё осталось. */
+  stepsLeft: number;
+}
+
+/** Полифем: отталкивание соседних флотов (управляет поставивший фигуру). */
+export interface PolyphemusPushState {
+  playerId: PlayerID;
+  /** Остров с Полифемом — от него отталкиваем. */
+  island: TerritoryId;
+}
+
 /** Рынок мифических существ: колода, открытые карты, сброс. */
 export interface CreatureMarket {
   /** Колода рубашкой вверх (берём с начала). */
@@ -245,6 +259,12 @@ export interface CycladesState {
   combat: CombatState | null;
   /** Активный приказ флоту (Посейдон) или null. */
   fleetMove: FleetMoveState | null;
+  /** Игрок, распродающий юнитов Сфинксом (выбирает что и сколько), или null. */
+  sphinxResell: PlayerID | null;
+  /** Активное движение Сильфиды (флот на N клеток) или null. */
+  sylphMove: SylphMoveState | null;
+  /** Активное отталкивание флота Полифемом или null. */
+  polyphemusPush: PolyphemusPushState | null;
   log: LogEntry[];
 }
 

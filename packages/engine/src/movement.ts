@@ -153,6 +153,35 @@ export function endFleetMove(G: CycladesState, pid: PlayerID): string | null {
   return null;
 }
 
+/** Сильфида: один шаг — двигает 1 корабль в соседнюю свою/пустую клетку, тратит 1 из бюджета. */
+export function applySylphStep(G: CycladesState, pid: PlayerID, fromSeaId: TerritoryId, toSeaId: TerritoryId): string | null {
+  const m = G.sylphMove;
+  if (!m || m.playerId !== pid) return 'нет движения Сильфиды';
+  if (m.stepsLeft <= 0) return 'клетки закончились';
+  const from = G.territories[fromSeaId];
+  const to = G.territories[toSeaId];
+  if (!from || !isSea(from) || from.ownerId !== pid || from.fleets <= 0) return 'нет своего флота';
+  if (!to || !isSea(to)) return 'цель — не море';
+  if (!from.adjacentSeas.includes(toSeaId)) return 'не соседняя клетка';
+  if (to.fleets > 0 && to.ownerId !== pid) return 'через Сильфиду нельзя входить во вражескую зону';
+  if (seaBlockedForFleet(G, toSeaId)) return 'зона закрыта (Кракен/Полифем)';
+  from.fleets -= 1;
+  if (from.fleets === 0) from.ownerId = null;
+  to.fleets += 1;
+  to.ownerId = pid;
+  m.stepsLeft -= 1;
+  log(G, `${G.players[pid].name}: Сильфида двигает корабль → ${to.name} (осталось ${m.stepsLeft}).`);
+  if (m.stepsLeft <= 0) G.sylphMove = null;
+  return null;
+}
+
+/** Завершить движение Сильфиды досрочно. */
+export function endSylph(G: CycladesState, pid: PlayerID): string | null {
+  if (!G.sylphMove || G.sylphMove.playerId !== pid) return 'нет движения Сильфиды';
+  G.sylphMove = null;
+  return null;
+}
+
 // --- Войска ---
 
 /** Острова, достижимые для войск с fromIsland по «мосту» из своих флотов. */

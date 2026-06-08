@@ -79,6 +79,9 @@ export function setupGame(ctx: Ctx, random?: RandomAPI): CycladesState {
     pendingCornucopia: null,
     combat: null,
     fleetMove: null,
+    sphinxResell: null,
+    sylphMove: null,
+    polyphemusPush: null,
     log: [{ cycle: 1, text: 'Партия началась. Боги ждут подношений.' }],
   };
 }
