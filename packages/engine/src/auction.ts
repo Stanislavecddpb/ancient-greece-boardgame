@@ -78,14 +78,20 @@ export function applyBid(
   if (amount < minBid) return `нужно минимум ${minBid}`;
   if (paymentFor(G.players[pid], amount) > G.players[pid].gold) return 'не хватает золота';
 
-  if (slot.occupantId) {
+  const displaced = slot.occupantId; // кого выбиваем (или null, если бог был свободен)
+  if (displaced) {
     log(G, `${G.players[pid].name} перебивает ставку за ${godLabel(god)}.`);
   }
   slot.occupantId = pid;
   slot.bid = amount;
 
-  const next = nextToAct(G, ctx, pid);
-  if (next) a.toAct = next;
+  // Выбитый игрок переставляет ставку сразу же; иначе ход идёт дальше по кругу.
+  if (displaced && displaced !== pid && !G.players[displaced].isEliminated) {
+    a.toAct = displaced;
+  } else {
+    const next = nextToAct(G, ctx, pid);
+    if (next) a.toAct = next;
+  }
   return null;
 }
 

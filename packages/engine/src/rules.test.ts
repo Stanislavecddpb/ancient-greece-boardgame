@@ -114,6 +114,28 @@ describe('аукцион', () => {
     expect(G.players['0'].gold).toBe(gold0 - 1); // Посейдон за 1
   });
 
+  it('выбитый игрок переставляет ставку сразу, а не после следующего по кругу', () => {
+    const ctx = ctxFor(3);
+    const G = setupGame(ctx);
+    G.auction = {
+      slots: [
+        { god: 'ares', occupantId: null, bid: 0 },
+        { god: 'poseidon', occupantId: null, bid: 0 },
+      ],
+      apollo: [],
+      toAct: '0',
+    };
+
+    expect(applyBid(G, ctx, '0', 'ares', 2)).toBeNull(); // '0' на Ареса
+    expect(G.auction!.toAct).toBe('1');                  // дальше по кругу
+    expect(applyBid(G, ctx, '1', 'ares', 3)).toBeNull(); // '1' перебивает '0'
+    expect(G.auction!.toAct).toBe('0');                  // сразу выбитый '0', НЕ '2'
+    expect(applyBid(G, ctx, '0', 'ares', 4)).toBeNull(); // '0' перебивает обратно
+    expect(G.auction!.toAct).toBe('1');                  // снова выбитый '1', НЕ '2'
+    expect(applyBid(G, ctx, '1', 'poseidon', 1)).toBeNull(); // '1' уходит на Посейдона
+    expect(G.auction!.toAct).toBe('2');                  // теперь ход дошёл до '2'
+  });
+
   it('жрецы дают скидку на оплату (минимум 1)', () => {
     expect(paymentFor({ priests: 0 }, 3)).toBe(3);
     expect(paymentFor({ priests: 2 }, 3)).toBe(1);
