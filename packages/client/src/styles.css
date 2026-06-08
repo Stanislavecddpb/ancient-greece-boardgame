@@ -73,12 +73,12 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
   position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 0.78rem; font-weight: 700;
   color: #f3ecd6; background: linear-gradient(0deg, #000c, #0000); padding: 10px 4px 4px;
 }
-/* цена существа — столбик монет по числу позиции (4/3/2) */
-.mk-coins { display: flex; flex-direction: column; gap: 3px; }
+/* цена существа — столбик монет-картинок по числу позиции (4/3/2) */
+.mk-coins { display: flex; flex-direction: column; gap: 2px; }
 .mk-coin {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: url('/icons/coin.png') center/contain no-repeat,
-    radial-gradient(circle at 35% 30%, #ffe07a, #f0c542 55%, #9c7416);
+  width: 34px; height: 34px;
+  background: url('/icons/coin.png') center/contain no-repeat;
+  filter: drop-shadow(0 1px 2px #0008);
 }
 .mk-empty { opacity: 0.6; font-size: 0.8rem; }
 
