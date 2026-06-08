@@ -368,6 +368,15 @@ export function applyBuyCreature(
   s.creatureBought = true;
   if (def.placed) {
     placeBoardCreature(G, def.id, pid, targetId!);
+    // Полифем: даём поставившему отодвинуть соседний флот (если он есть).
+    if (def.id === 'polyphemus' && boardCreatureAt(G, targetId!)?.kind === 'polyphemus') {
+      const isl = G.territories[targetId!];
+      const hasAdjFleets = isIsland(isl) && isl.adjacentSeas.some((sid) => {
+        const s = G.territories[sid];
+        return isSea(s) && s.fleets > 0;
+      });
+      if (hasAdjFleets) G.polyphemusPush = { playerId: pid, island: targetId! };
+    }
     // Кракен при установке топит весь флот в своей зоне (если фигура встала).
     if (def.id === 'kraken' && boardCreatureAt(G, targetId!)?.kind === 'kraken') {
       const sea = G.territories[targetId!];

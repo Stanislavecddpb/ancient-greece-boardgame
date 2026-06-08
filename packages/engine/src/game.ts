@@ -25,7 +25,7 @@ import {
 import { metropolisCount, islandsOf, log } from './helpers';
 import { applyBuildMetropolis } from './metropolis';
 import { applyBuyCreature, applyCycleCreatures, expireBoardCreatures, applySellUnits } from './creatures';
-import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, endSylph } from './movement';
+import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, endSylph, applyPushFleet, endPolyphemus } from './movement';
 import { dieFromRandom } from './combat';
 import type { TerritoryId as TId } from './types';
 
@@ -205,6 +205,15 @@ export const CycladesGame: Game<CycladesState> = {
         // Сильфида: завершить движение досрочно.
         endSylph: ({ G, playerID }) => {
           if (endSylph(G, playerID!)) return INVALID_MOVE;
+        },
+
+        // Полифем: отодвинуть соседний флот от острова.
+        pushFleet: ({ G, playerID }, fromId: TId, toId: TId) => {
+          if (applyPushFleet(G, playerID!, fromId, toId)) return INVALID_MOVE;
+        },
+        // Полифем: завершить отталкивание досрочно.
+        endPolyphemus: ({ G, playerID }) => {
+          if (endPolyphemus(G, playerID!)) return INVALID_MOVE;
         },
 
         // Аполлон: первый выбравший кладёт рог изобилия на свой остров.

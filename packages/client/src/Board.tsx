@@ -102,7 +102,18 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
   const sel = selected ? G.territories[selected] : null;
   const canAct = ctx.phase === 'actions' && !G.pendingCornucopia && !!turn && activePlayerId(G) === me;
   let movement: MovementCtx | null = null;
-  if (canAct && me && G.sylphMove && G.sylphMove.playerId === me && sel && isSea(sel) && sel.ownerId === me && sel.fleets > 0) {
+  if (canAct && me && G.polyphemusPush && G.polyphemusPush.playerId === me && sel && isSea(sel) && sel.fleets > 0) {
+    // Полифем: выбран соседний с островом флот — стрелки «от острова».
+    const island = G.territories[G.polyphemusPush.island];
+    const adj = isIsland(island) ? island.adjacentSeas : [];
+    if (adj.includes(sel.id)) {
+      const targets = sel.adjacentSeas.filter((id) => {
+        const t = G.territories[id];
+        return isSea(t) && !adj.includes(id) && !(t.fleets > 0 && t.ownerId !== (sel as any).ownerId);
+      });
+      if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.pushFleet(sel.id, to); setSelected(null); } };
+    }
+  } else if (canAct && me && G.sylphMove && G.sylphMove.playerId === me && sel && isSea(sel) && sel.ownerId === me && sel.fleets > 0) {
     // Сильфида: выбран свой флот — стрелки в соседние свои/пустые клетки, по 1 кораблю.
     const targets = sel.adjacentSeas.filter((id) => {
       const t = G.territories[id];
@@ -136,6 +147,8 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
           <CombatPanel G={G} me={me} moves={moves} />
         ) : G.fleetMove && G.fleetMove.playerId === me ? (
           <FleetMovePanel G={G} moves={moves} take={fleetTake} setTake={setFleetTake} />
+        ) : G.polyphemusPush && G.polyphemusPush.playerId === me ? (
+          <PolyphemusPanel moves={moves} />
         ) : G.sylphMove && G.sylphMove.playerId === me ? (
           <SylphPanel G={G} moves={moves} />
         ) : G.sphinxResell === me ? (
@@ -458,6 +471,19 @@ function SylphPanel({ G, moves }: { G: CycladesState; moves: any }) {
       <div className="ab-controls">
         <span className="sel-hint">выберите свой флот, кликайте стрелку (1 корабль = 1 клетка)</span>
         <button className="end-turn" onClick={() => moves.endSylph()}>Готово</button>
+      </div>
+    </div>
+  );
+}
+
+/** Полифем: отталкивание соседнего флота от острова. */
+function PolyphemusPanel({ moves }: { moves: any }) {
+  return (
+    <div className="action-bar fleetmove">
+      <div className="ab-title">👁️ Полифем: отодвиньте соседний флот от острова</div>
+      <div className="ab-controls">
+        <span className="sel-hint">выберите флот у острова и кликните стрелку (от острова)</span>
+        <button className="end-turn" onClick={() => moves.endPolyphemus()}>Готово</button>
       </div>
     </div>
   );

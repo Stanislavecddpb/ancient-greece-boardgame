@@ -182,6 +182,47 @@ export function endSylph(G: CycladesState, pid: PlayerID): string | null {
   return null;
 }
 
+/**
+ * Полифем: поставивший игрок отодвигает соседний с островом флот (даже чужой)
+ * на одну клетку дальше от острова. Двигается весь стек; цвета не смешиваются.
+ */
+export function applyPushFleet(G: CycladesState, pid: PlayerID, fromSeaId: TerritoryId, toSeaId: TerritoryId): string | null {
+  const pp = G.polyphemusPush;
+  if (!pp || pp.playerId !== pid) return 'нет отталкивания';
+  const island = G.territories[pp.island];
+  if (!island || !isIsland(island)) return 'нет острова Полифема';
+  const from = G.territories[fromSeaId];
+  const to = G.territories[toSeaId];
+  if (!from || !isSea(from) || from.fleets <= 0) return 'нет флота для отталкивания';
+  if (!island.adjacentSeas.includes(fromSeaId)) return 'эта зона не рядом с Полифемом';
+  if (!to || !isSea(to)) return 'цель — не море';
+  if (!from.adjacentSeas.includes(toSeaId)) return 'не соседняя клетка';
+  if (island.adjacentSeas.includes(toSeaId)) return 'нужно отодвинуть дальше от острова';
+  if (seaBlockedForFleet(G, toSeaId)) return 'зона закрыта (Кракен/Полифем)';
+  if (to.fleets > 0 && to.ownerId !== from.ownerId) return 'там флот другого цвета';
+
+  to.fleets += from.fleets;
+  to.ownerId = from.ownerId;
+  from.fleets = 0;
+  from.ownerId = null;
+  log(G, `Полифем отталкивает флот → ${to.name}.`);
+
+  // Если рядом с островом больше нет флота — отталкивание завершено.
+  const more = island.adjacentSeas.some((sid) => {
+    const s = G.territories[sid];
+    return isSea(s) && s.fleets > 0;
+  });
+  if (!more) G.polyphemusPush = null;
+  return null;
+}
+
+/** Завершить отталкивание Полифемом досрочно. */
+export function endPolyphemus(G: CycladesState, pid: PlayerID): string | null {
+  if (!G.polyphemusPush || G.polyphemusPush.playerId !== pid) return 'нет отталкивания';
+  G.polyphemusPush = null;
+  return null;
+}
+
 // --- Войска ---
 
 /** Острова, достижимые для войск с fromIsland по «мосту» из своих флотов. */

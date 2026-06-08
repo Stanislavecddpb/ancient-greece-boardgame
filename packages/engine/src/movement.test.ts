@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Ctx } from 'boardgame.io';
 import { setupGame } from './setup';
-import { startFleetMove, hopFleet, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep } from './movement';
+import { startFleetMove, hopFleet, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, applyPushFleet } from './movement';
 import { placeBoardCreature } from './creatures';
 import { isSea, isIsland } from './board';
 import type { CycladesState, Sea } from './types';
@@ -224,6 +224,28 @@ describe('фигуры существ в движении', () => {
     expect(bSea.fleets).toBe(1);
     expect(a.fleets).toBe(1);
     expect(G.sylphMove!.stepsLeft).toBe(9);
+  });
+
+  it('Полифем отталкивает соседний флот дальше от острова', () => {
+    const G = setupGame(ctxFor(2));
+    let islId: string | null = null, adjId: string | null = null, destId: string | null = null;
+    for (const cand of Object.values(G.territories)) {
+      if (!isIsland(cand)) continue;
+      for (const sid of cand.adjacentSeas) {
+        const s = G.territories[sid];
+        if (!isSea(s)) continue;
+        const d = s.adjacentSeas.find((x) => { const t = G.territories[x]; return isSea(t) && !cand.adjacentSeas.includes(x); });
+        if (d) { islId = cand.id; adjId = sid; destId = d; break; }
+      }
+      if (islId) break;
+    }
+    const adj = G.territories[adjId!] as Sea;
+    adj.ownerId = '1'; adj.fleets = 2;
+    placeBoardCreature(G, 'polyphemus', '0', islId!);
+    G.polyphemusPush = { playerId: '0', island: islId! };
+    expect(applyPushFleet(G, '0', adjId!, destId!)).toBeNull();
+    expect(adj.fleets).toBe(0);
+    expect((G.territories[destId!] as Sea).fleets).toBe(2);
   });
 
   it('Полифем не пускает флот в соседние зоны своего острова', () => {
