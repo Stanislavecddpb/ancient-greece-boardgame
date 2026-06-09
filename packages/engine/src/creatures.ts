@@ -321,6 +321,34 @@ export function boardCreatureAt(G: CycladesState, location: string): { kind: str
 }
 
 /**
+ * Ставит фигуру существа на доску и выполняет «при установке»-эффекты:
+ * Полифем открывает отталкивание соседнего флота, Кракен топит флот в своей зоне.
+ * Общая логика для обычной покупки и розыгрыша Химерой.
+ */
+function placeCreatureFigure(G: CycladesState, pid: PlayerID, kind: string, targetId: string): void {
+  placeBoardCreature(G, kind, pid, targetId);
+  // Полифем: даём поставившему отодвинуть соседний флот (если он есть).
+  if (kind === 'polyphemus' && boardCreatureAt(G, targetId)?.kind === 'polyphemus') {
+    const isl = G.territories[targetId];
+    const hasAdjFleets = isIsland(isl) && isl.adjacentSeas.some((sid) => {
+      const s = G.territories[sid];
+      return isSea(s) && s.fleets > 0;
+    });
+    if (hasAdjFleets) G.polyphemusPush = { playerId: pid, island: targetId };
+  }
+  // Кракен при установке топит весь флот в своей зоне (если фигура встала).
+  if (kind === 'kraken' && boardCreatureAt(G, targetId)?.kind === 'kraken') {
+    const sea = G.territories[targetId];
+    if (isSea(sea) && sea.fleets > 0 && sea.ownerId) {
+      G.players[sea.ownerId].fleetsSupply = Math.min(UNIT_SUPPLY, G.players[sea.ownerId].fleetsSupply + sea.fleets);
+      sea.fleets = 0;
+      sea.ownerId = null;
+      log(G, `Кракен топит флот в ${sea.name}.`);
+    }
+  }
+}
+
+/**
  * Покупка существа из рынка (slotIndex 0..2) с немедленным эффектом.
  * Возвращает текст ошибки или null при успехе.
  */
@@ -354,28 +382,7 @@ export function applyBuyCreature(
 
   G.players[pid].gold -= cost;
   s.creatureBought = true;
-  if (def.placed) {
-    placeBoardCreature(G, def.id, pid, targetId!);
-    // Полифем: даём поставившему отодвинуть соседний флот (если он есть).
-    if (def.id === 'polyphemus' && boardCreatureAt(G, targetId!)?.kind === 'polyphemus') {
-      const isl = G.territories[targetId!];
-      const hasAdjFleets = isIsland(isl) && isl.adjacentSeas.some((sid) => {
-        const s = G.territories[sid];
-        return isSea(s) && s.fleets > 0;
-      });
-      if (hasAdjFleets) G.polyphemusPush = { playerId: pid, island: targetId! };
-    }
-    // Кракен при установке топит весь флот в своей зоне (если фигура встала).
-    if (def.id === 'kraken' && boardCreatureAt(G, targetId!)?.kind === 'kraken') {
-      const sea = G.territories[targetId!];
-      if (isSea(sea) && sea.fleets > 0 && sea.ownerId) {
-        G.players[sea.ownerId].fleetsSupply = Math.min(UNIT_SUPPLY, G.players[sea.ownerId].fleetsSupply + sea.fleets);
-        sea.fleets = 0;
-        sea.ownerId = null;
-        log(G, `Кракен топит флот в ${sea.name}.`);
-      }
-    }
-  }
+  if (def.placed) placeCreatureFigure(G, pid, def.id, targetId!);
   // Купленное уходит в сброс, слот остаётся пустым (рубашкой вверх) и НЕ
   // сдвигается. Существо в этот слот придёт при следующей прокрутке (конец
   // хода или Зевс) — туда сдвинется верхнее существо.
@@ -435,10 +442,10 @@ function reshuffleDiscardIntoDeck(G: CycladesState): void {
   G.creatures.discard = [];
 }
 
-/** Существа, которые Химера может разыграть из сброса (немгновенные/фигурные — нельзя). */
+/** Существа, которые Химера может разыграть из сброса (всё, кроме самой Химеры). */
 export function chimeraPlayable(creatureId: string): boolean {
   const def = CREATURES[creatureId];
-  return !!def && !def.placed && def.id !== 'chimera';
+  return !!def && def.id !== 'chimera';
 }
 
 /**
@@ -461,8 +468,21 @@ export function applyChimeraReplay(
     const fig = G.boardCreatures.find((c) => c.location === targetId);
     if (fig && fig.kind === 'chiron') return 'остров под защитой Хирона';
   }
-  const applyErr = def.apply(G, pid, targetId);
-  if (applyErr) return applyErr;
+
+  // Фигурное существо — ставим фигуру (игрок выбирает клетку); иначе мгновенный эффект.
+  if (def.placed) {
+    // Химера: если на клетке уже стоит фигура — она снимается, и игрок ставит свою.
+    const existing = G.boardCreatures.findIndex((c) => c.location === targetId);
+    if (existing >= 0) {
+      const old = G.boardCreatures[existing];
+      G.boardCreatures.splice(existing, 1);
+      log(G, `Химера убирает фигуру (${CREATURES[old.kind]?.name ?? old.kind}) с клетки.`);
+    }
+    placeCreatureFigure(G, pid, def.id, targetId!);
+  } else {
+    const applyErr = def.apply(G, pid, targetId);
+    if (applyErr) return applyErr;
+  }
 
   log(G, `${G.players[pid].name}: Химера разыгрывает ${def.name}. ${def.desc}.`);
   reshuffleDiscardIntoDeck(G);

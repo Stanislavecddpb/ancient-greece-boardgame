@@ -121,9 +121,10 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
       return isSea(t) && !(t.fleets > 0 && t.ownerId !== me);
     });
     if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.sylphStep(sel.id, to); setSelected(to); } };
-  } else if (canAct && me && G.pegasusMove === me && sel && isIsland(sel) && sel.ownerId === me && sel.troops > 0) {
-    // Пегас: выбран свой остров-источник — стрелки на ЛЮБОЙ другой остров (без моста);
-    // если на цели войска врага — начнётся бой.
+  } else if (canAct && me && G.pegasusMove === me && sel && isIsland(sel) && sel.ownerId === me && sel.troops > 0
+    && !G.boardCreatures.some((c) => c.kind === 'medusa' && c.location === sel.id)) {
+    // Пегас: выбран свой остров-источник (не под Медузой) — стрелки на ЛЮБОЙ другой
+    // остров (без моста); если на цели войска врага — начнётся бой.
     const n = Math.min(Math.max(1, troopCount), sel.troops);
     const targets = Object.values(G.territories)
       .filter((t): t is Territory => isIsland(t) && t.id !== sel.id)

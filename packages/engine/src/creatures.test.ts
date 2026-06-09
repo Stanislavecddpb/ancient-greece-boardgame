@@ -226,6 +226,16 @@ describe('Пегас', () => {
     expect(G.combat).toMatchObject({ kind: 'land', location: 'home_e', attackerId: '0', defenderId: '1', attackerUnits: 2 });
     if (a.kind === 'island') expect(a.troops).toBe(1); // 2 ушли в десант
   });
+
+  it('нельзя улететь Пегасом с острова под Медузой', () => {
+    const G = withMarket(['pegasus', 'a', 'b']);
+    G.players['0'].gold = 9;
+    applyBuyCreature(G, '0', 0);
+    const a = G.territories['home_n'];
+    if (a.kind === 'island') { a.ownerId = '0'; a.troops = 3; }
+    placeBoardCreature(G, 'medusa', '1', 'home_n');
+    expect(applyPegasusMove(G, '0', 'home_n', 'home_e', 1)).toBe('остров под Медузой: войска нельзя уводить');
+  });
 });
 
 describe('Сатир', () => {
@@ -326,12 +336,27 @@ describe('Химера', () => {
     expect(G.creatures.deck).toContain('chimera');
   });
 
-  it('нельзя разыграть фигурное существо', () => {
+  it('разыгрывает фигурное существо — ставит фигуру на выбранную клетку', () => {
     const G = withMarket(['chimera', 'a', 'b']);
     G.players['0'].gold = 9;
-    G.creatures.discard = ['kraken'];
+    G.creatures.discard = ['medusa'];
     applyBuyCreature(G, '0', 0);
-    expect(applyChimeraReplay(G, '0', 'kraken')).toBe('Химерой нельзя разыграть это существо');
+    expect(applyChimeraReplay(G, '0', 'medusa', 'home_n')).toBeNull();
+    expect(G.boardCreatures.some((c) => c.kind === 'medusa' && c.location === 'home_n' && c.ownerId === '0')).toBe(true);
+    expect(G.chimeraPick).toBeNull();
+    expect(G.creatures.discard).toHaveLength(0);
+  });
+
+  it('фигура Химеры на занятой клетке снимает старую фигуру и ставит свою', () => {
+    const G = withMarket(['chimera', 'a', 'b']);
+    G.players['0'].gold = 9;
+    placeBoardCreature(G, 'minotaur', '1', 'home_n'); // чужая фигура
+    G.creatures.discard = ['medusa'];
+    applyBuyCreature(G, '0', 0);
+    expect(applyChimeraReplay(G, '0', 'medusa', 'home_n')).toBeNull();
+    const figs = G.boardCreatures.filter((c) => c.location === 'home_n');
+    expect(figs).toHaveLength(1);
+    expect(figs[0]).toMatchObject({ kind: 'medusa', ownerId: '0' });
   });
 
   it('endChimera перетасовывает сброс без розыгрыша', () => {

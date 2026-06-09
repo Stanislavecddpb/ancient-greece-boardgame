@@ -236,6 +236,7 @@ export function applyPegasusMove(
   const from = G.territories[fromIslandId];
   const to = G.territories[toIslandId];
   if (!from || !isIsland(from) || from.ownerId !== pid || from.troops <= 0) return 'нет своего острова с войсками';
+  if (medusaLocks(G, fromIslandId)) return 'остров под Медузой: войска нельзя уводить';
   if (!to || !isIsland(to)) return 'цель — не остров';
   if (fromIslandId === toIslandId) return 'нужен другой остров';
   if (!Number.isInteger(count) || count < 1 || count > from.troops) return 'неверное число войск';
