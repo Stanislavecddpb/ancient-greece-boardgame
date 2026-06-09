@@ -293,8 +293,8 @@ export interface CycladesState {
 
 // --- Константы правил ---
 
-/** Грань боевой кости Cyclades: значения 0,0,1,1,2,3. */
-export const COMBAT_DIE: number[] = [0, 0, 1, 1, 2, 3];
+/** Грани боевой кости Cyclades: 1, 1, 2, 2, 0, 3. */
+export const COMBAT_DIE: number[] = [1, 1, 2, 2, 0, 3];
 
 /** Лимит фигурок одного типа у игрока (войска / флот). */
 export const UNIT_SUPPLY = 8;
