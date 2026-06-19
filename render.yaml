@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: cyclades
+    runtime: node
+    plan: free
+    # Билд: ставим зависимости (включая dev — нужны typescript/vite) и собираем
+    # движок, сервер и клиент.
+    buildCommand: npm install --include=dev && npm run build
+    # Старт: сервер (Koa + socket.io) через tsx раздаёт клиент и держит сокеты.
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
