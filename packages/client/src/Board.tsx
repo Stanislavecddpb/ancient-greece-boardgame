@@ -27,6 +27,7 @@ import type { CreatureDef, Territory } from '@cyclades/engine';
 import { BoardMap } from './BoardMap';
 import type { MovementCtx } from './BoardMap';
 import { GodBoard } from './GodBoard';
+import { savedName } from './net';
 
 const GOD_EMOJI: Record<GodName, string> = {
   ares: '🗡️', poseidon: '🌊', zeus: '⚡', athena: '🦉', apollo: '☀️',
@@ -115,12 +116,16 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
       if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.pushFleet(sel.id, to); setSelected(null); } };
     }
   } else if (canAct && me && G.sylphMove && G.sylphMove.playerId === me && sel && isSea(sel) && sel.ownerId === me && sel.fleets > 0) {
-    // Сильфида: выбран свой флот — стрелки в соседние свои/пустые клетки, по 1 кораблю.
-    const targets = sel.adjacentSeas.filter((id) => {
-      const t = G.territories[id];
-      return isSea(t) && !(t.fleets > 0 && t.ownerId !== me);
-    });
+    // Сильфида: выбран свой флот — стрелки в соседние клетки (включая вражеские для атаки).
+    const targets = sel.adjacentSeas.filter((id) => isSea(G.territories[id]));
     if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.sylphStep(sel.id, to); setSelected(to); } };
+  } else if (canAct && me && G.krakenMove && G.krakenMove.playerId === me && G.krakenMove.stepsLeft > 0) {
+    // Кракен: стрелки от текущей фигуры в соседние морские зоны (топит флот по пути).
+    const at = G.territories[G.krakenMove.at];
+    const targets = isSea(at)
+      ? at.adjacentSeas.filter((id) => isSea(G.territories[id]) && !G.boardCreatures.some((c) => c.location === id && c.kind !== 'kraken'))
+      : [];
+    if (targets.length) movement = { from: G.krakenMove.at, targets, onMove: (to) => moves.krakenStep(to) };
   } else if (canAct && me && G.pegasusMove === me && sel && isIsland(sel) && sel.ownerId === me && sel.troops > 0
     && !G.boardCreatures.some((c) => c.kind === 'medusa' && c.location === sel.id)) {
     // Пегас: выбран свой остров-источник (не под Медузой) — стрелки на ЛЮБОЙ другой
@@ -160,9 +165,11 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
         ) : G.fleetMove && G.fleetMove.playerId === me ? (
           <FleetMovePanel G={G} moves={moves} take={fleetTake} setTake={setFleetTake} />
         ) : G.polyphemusPush && G.polyphemusPush.playerId === me ? (
-          <PolyphemusPanel moves={moves} />
+          <PolyphemusPanel G={G} moves={moves} />
         ) : G.sylphMove && G.sylphMove.playerId === me ? (
           <SylphPanel G={G} moves={moves} />
+        ) : G.krakenMove && G.krakenMove.playerId === me ? (
+          <KrakenPanel G={G} moves={moves} />
         ) : G.sphinxResell === me ? (
           <SphinxPanel G={G} me={me} moves={moves} />
         ) : G.pegasusMove === me ? (
@@ -216,6 +223,8 @@ function PlayersCorners({ G, ctx, activeId, me, nameOf }: {
               <span title="жрецы">⚜️{pid === me ? p.priests : '?'}</span>
               <span title="философы">📜{pid === me ? p.philosophers : '?'}</span>
               <span title="метрополии">🏛️{metropolisCount(G, pid)}</span>
+              <span title="войска в запасе">⚔️{pid === me ? p.troopsSupply : '?'}</span>
+              <span title="флот в запасе">⛵{pid === me ? p.fleetsSupply : '?'}</span>
             </div>
           </div>
         );
@@ -344,6 +353,16 @@ function Lobby({ G, ctx, me, moves, matchData, nameOf }: {
   const full = filled >= total;
   const isHost = me === '0';
   void nameOf;
+
+  // Передаём настоящее имя (из matchData или localStorage) в состояние игры.
+  useEffect(() => {
+    if (!me || !moves.setName) return;
+    const realName = matchData?.find((x) => String(x.id) === me)?.name || savedName();
+    if (realName && realName !== G.players[me]?.name) {
+      moves.setName(realName);
+    }
+  }, []);
+
   return (
     <div className="lobby">
       <div className="lobby-card">
@@ -508,14 +527,39 @@ function SylphPanel({ G, moves }: { G: CycladesState; moves: any }) {
   );
 }
 
+/** Кракен: перемещение фигуры по морю (1🪙 за клетку, топит встречный флот). */
+function KrakenPanel({ G, moves }: { G: CycladesState; moves: any }) {
+  const budget = G.krakenMove!.stepsLeft;
+  return (
+    <div className="action-bar fleetmove">
+      <div className="ab-title">🦑 Кракен: подвиньте фигуру по морю · бюджет: {budget}🪙</div>
+      <div className="ab-controls">
+        <span className="sel-hint">
+          {budget > 0 ? 'кликайте стрелку (1🪙/клетка) — встреченный флот тонет' : 'нет золота на движение'}
+        </span>
+        <button className="end-turn" onClick={() => moves.endKraken()}>Готово</button>
+      </div>
+    </div>
+  );
+}
+
 /** Полифем: отталкивание соседнего флота от острова. */
-function PolyphemusPanel({ moves }: { moves: any }) {
+function PolyphemusPanel({ G, moves }: { G: CycladesState; moves: any }) {
+  // Завершить можно только когда рядом с островом Полифема не осталось флотов.
+  const pp = G.polyphemusPush;
+  const island = pp ? G.territories[pp.island] : null;
+  const adjFleets = !!island && isIsland(island) && island.adjacentSeas.some((sid) => {
+    const s = G.territories[sid];
+    return isSea(s) && s.fleets > 0;
+  });
   return (
     <div className="action-bar fleetmove">
       <div className="ab-title">👁️ Полифем: отодвиньте соседний флот от острова</div>
       <div className="ab-controls">
-        <span className="sel-hint">выберите флот у острова и кликните стрелку (от острова)</span>
-        <button className="end-turn" onClick={() => moves.endPolyphemus()}>Готово</button>
+        <span className="sel-hint">
+          {adjFleets ? 'отодвиньте все флоты от острова — затем «Готово»' : 'рядом флотов нет, можно завершать'}
+        </span>
+        <button className="end-turn" disabled={adjFleets} onClick={() => moves.endPolyphemus()}>Готово</button>
       </div>
     </div>
   );
@@ -754,10 +798,18 @@ function CreatureButtons({ G, pid, moves, sel, selected, god, s }: {
 }
 
 function EventLog({ G }: { G: CycladesState }) {
-  const recent = G.log.slice(-6).reverse();
+  const [open, setOpen] = useState(true);
+  const recent = G.log.slice(-20).reverse();
   return (
-    <div className="log">
-      {recent.map((e, i) => <div key={i} className="log-line">[ц{e.cycle}] {e.text}</div>)}
+    <div className={`log ${open ? 'open' : 'collapsed'}`}>
+      <button className="log-toggle" onClick={() => setOpen((o) => !o)}>
+        {open ? '▾' : '▸'} Лог
+      </button>
+      {open && (
+        <div className="log-body">
+          {recent.map((e, i) => <div key={i} className="log-line">[ц{e.cycle}] {e.text}</div>)}
+        </div>
+      )}
     </div>
   );
 }

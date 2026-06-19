@@ -133,6 +133,11 @@ export interface AuctionState {
   apollo: PlayerID[];
   /** Чей сейчас ход делать ставку. */
   toAct: PlayerID;
+  /**
+   * Кого только что перебили и с какого бога. Этот игрок переставляет ставку
+   * немедленно и НЕ может сразу вернуться на тот же бог (иначе пинг-понг).
+   */
+  lastDisplaced?: { pid: PlayerID; god: GodName } | null;
 }
 
 /** Один пункт очереди исполнения действий: бог и его владелец. */
@@ -214,6 +219,15 @@ export interface SylphMoveState {
   stepsLeft: number;
 }
 
+/** Кракен: после установки можно двигать фигуру по 1 клетке за 1 GP, топя встречный флот. */
+export interface KrakenMoveState {
+  playerId: PlayerID;
+  /** Где сейчас стоит фигура Кракена. */
+  at: TerritoryId;
+  /** Сколько ещё перемещений можно оплатить (ограничено золотом). */
+  stepsLeft: number;
+}
+
 /** Полифем: отталкивание соседних флотов (управляет поставивший фигуру). */
 export interface PolyphemusPushState {
   playerId: PlayerID;
@@ -276,6 +290,8 @@ export interface CycladesState {
   sphinxResell: PlayerID | null;
   /** Активное движение Сильфиды (флот на N клеток) или null. */
   sylphMove: SylphMoveState | null;
+  /** Активное перемещение Кракена (по 1 клетке за 1 GP) или null. */
+  krakenMove: KrakenMoveState | null;
   /** Активное отталкивание флота Полифемом или null. */
   polyphemusPush: PolyphemusPushState | null;
   /** Игрок, перемещающий войска Пегасом (остров→остров без моста), или null. */

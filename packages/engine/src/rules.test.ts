@@ -130,9 +130,10 @@ describe('аукцион', () => {
     expect(G.auction!.toAct).toBe('1');                  // дальше по кругу
     expect(applyBid(G, ctx, '1', 'ares', 3)).toBeNull(); // '1' перебивает '0'
     expect(G.auction!.toAct).toBe('0');                  // сразу выбитый '0', НЕ '2'
-    expect(applyBid(G, ctx, '0', 'ares', 4)).toBeNull(); // '0' перебивает обратно
-    expect(G.auction!.toAct).toBe('1');                  // снова выбитый '1', НЕ '2'
-    expect(applyBid(G, ctx, '1', 'poseidon', 1)).toBeNull(); // '1' уходит на Посейдона
+    // Выбитому нельзя тут же вернуться на того же бога — иначе пинг-понг.
+    expect(applyBid(G, ctx, '0', 'ares', 4)).not.toBeNull();
+    expect(G.auction!.toAct).toBe('0');                  // ход остаётся за '0'
+    expect(applyBid(G, ctx, '0', 'poseidon', 1)).toBeNull(); // '0' идёт на другого бога
     expect(G.auction!.toAct).toBe('2');                  // теперь ход дошёл до '2'
   });
 

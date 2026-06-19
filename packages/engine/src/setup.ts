@@ -81,6 +81,7 @@ export function setupGame(ctx: Ctx, random?: RandomAPI): CycladesState {
     fleetMove: null,
     sphinxResell: null,
     sylphMove: null,
+    krakenMove: null,
     polyphemusPush: null,
     pegasusMove: null,
     chimeraPick: null,

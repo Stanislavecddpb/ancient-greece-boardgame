@@ -188,12 +188,22 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 .mv-arrow { animation: mvpulse 1.3s ease-in-out infinite; }
 @keyframes mvpulse { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
 
-/* лог */
+/* лог — виден всем, сворачивается кнопкой */
 .log {
   position: absolute; bottom: 10px; left: 10px; z-index: 8; max-width: 320px;
-  font-size: 0.72rem; opacity: 0.7; pointer-events: none;
+  font-size: 0.72rem; pointer-events: auto;
+  background: #0a1622e0; border: 1px solid #2a3f5a; border-radius: 8px; padding: 4px 6px;
 }
-.log-line { margin: 1px 0; text-shadow: 0 1px 2px #000; }
+.log-toggle {
+  background: transparent; color: #cdd7e6; font-size: 0.72rem; font-weight: 700;
+  padding: 1px 4px; border-radius: 5px;
+}
+.log-toggle:hover { background: #ffffff14; }
+.log-body { max-height: 28vh; overflow-y: auto; margin-top: 3px; }
+.log.collapsed { opacity: 0.85; }
+/* раскрытый лог поверх угловой панели игрока, чтобы она его не перекрывала */
+.log.open { z-index: 16; }
+.log-line { margin: 1px 0; text-shadow: 0 1px 2px #000; opacity: 0.92; }
 
 /* ===== Поле богов ===== */
 .godboard {
@@ -247,7 +257,18 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 .gs-build { font-size: 0.68rem; margin-top: 3px; background: #0003; border-radius: 4px; padding: 1px 5px; display: inline-block; }
 .gs-occ { font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
 
-/* ставочная дорожка */
+/* строка бога: крупный кружок-владелец слева + карта бога справа */
+.god-row { display: flex; align-items: center; gap: 8px; }
+.god-row .god-slot { flex: 1; min-width: 0; }
+.god-owner-dot {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: #1b2330; border: 2px dashed #3a4660;
+}
+.god-owner-dot.filled { border: 2px solid #fff6; box-shadow: 0 0 6px #0008; }
+.god-owner-dot.acting { box-shadow: 0 0 0 3px #ffd76a, 0 0 12px #ffd76a99; animation: dotpulse 1.3s ease-in-out infinite; }
+@keyframes dotpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+
+/* ставочная дорожка — кружки 1…10 + кнопка +10 */
 .bid-track { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; }
 .bt-priest { font-size: 0.6rem; opacity: 0.8; margin-right: 2px; }
 .bt-cell {

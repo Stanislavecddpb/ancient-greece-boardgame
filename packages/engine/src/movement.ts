@@ -163,10 +163,26 @@ export function applySylphStep(G: CycladesState, pid: PlayerID, fromSeaId: Terri
   if (!from || !isSea(from) || from.ownerId !== pid || from.fleets <= 0) return 'нет своего флота';
   if (!to || !isSea(to)) return 'цель — не море';
   if (!from.adjacentSeas.includes(toSeaId)) return 'не соседняя клетка';
-  if (to.fleets > 0 && to.ownerId !== pid) return 'через Сильфиду нельзя входить во вражескую зону';
   if (seaBlockedForFleet(G, toSeaId)) return 'зона закрыта (Кракен/Полифем)';
+
+  const enemy = to.fleets > 0 && to.ownerId !== pid;
   from.fleets -= 1;
   if (from.fleets === 0) from.ownerId = null;
+
+  if (enemy) {
+    const defenderId = to.ownerId!;
+    G.combat = {
+      kind: 'naval', location: toSeaId, fromId: fromSeaId,
+      attackerId: pid, defenderId,
+      attackerUnits: 1, defenderUnits: to.fleets,
+      defenderBonus: navalDefenseBonus(G, toSeaId, defenderId),
+      round: 0, lastRoll: null,
+    };
+    log(G, `${G.players[pid].name}: Сильфида атакует флот у ${to.name}.`);
+    G.sylphMove = null;
+    return null;
+  }
+
   to.fleets += 1;
   to.ownerId = pid;
   m.stepsLeft -= 1;
@@ -216,9 +232,16 @@ export function applyPushFleet(G: CycladesState, pid: PlayerID, fromSeaId: Terri
   return null;
 }
 
-/** Завершить отталкивание Полифемом досрочно. */
+/** Завершить отталкивание Полифемом — только когда рядом с островом не осталось флота. */
 export function endPolyphemus(G: CycladesState, pid: PlayerID): string | null {
-  if (!G.polyphemusPush || G.polyphemusPush.playerId !== pid) return 'нет отталкивания';
+  const pp = G.polyphemusPush;
+  if (!pp || pp.playerId !== pid) return 'нет отталкивания';
+  const island = G.territories[pp.island];
+  const stillAdjacent = isIsland(island) && island.adjacentSeas.some((sid) => {
+    const s = G.territories[sid];
+    return isSea(s) && s.fleets > 0;
+  });
+  if (stillAdjacent) return 'сначала отодвиньте все флоты от острова';
   G.polyphemusPush = null;
   return null;
 }

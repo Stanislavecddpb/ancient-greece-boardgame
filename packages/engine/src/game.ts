@@ -24,7 +24,7 @@ import {
 } from './actions';
 import { metropolisCount, islandsOf, log } from './helpers';
 import { applyPlaceMetropolis } from './metropolis';
-import { applyBuyCreature, applyCycleCreatures, expireBoardCreatures, applySellUnits, applyChimeraReplay, endChimera, applySatyrSteal, endSatyr, applyCyclopsReplace, endCyclops } from './creatures';
+import { applyBuyCreature, applyCycleCreatures, expireBoardCreatures, applySellUnits, applyChimeraReplay, endChimera, applySatyrSteal, endSatyr, applyCyclopsReplace, endCyclops, applyKrakenStep, endKraken } from './creatures';
 import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, endSylph, applyPushFleet, endPolyphemus, applyPegasusMove, endPegasus } from './movement';
 import { dieFromRandom } from './combat';
 import type { TerritoryId as TId } from './types';
@@ -50,12 +50,20 @@ export const CycladesGame: Game<CycladesState> = {
       start: true,
       next: 'auction',
       endIf: ({ G }) => G.started,
+      turn: {
+        activePlayers: { all: 'default' },
+      },
       moves: {
         startGame: ({ G, ctx, random, playerID }) => {
           if (playerID !== '0' || G.started) return INVALID_MOVE;
           G.started = true;
           G.startIndex = random.Die(ctx.numPlayers) - 1; // случайный первый игрок
           log(G, 'Игра началась. Очерёдность хода определена.');
+        },
+        setName: ({ G, playerID }, name: string) => {
+          if (!playerID || !G.players[playerID]) return INVALID_MOVE;
+          const n = String(name).trim().slice(0, 20);
+          if (n) G.players[playerID].name = n;
         },
       },
     },
@@ -203,6 +211,15 @@ export const CycladesGame: Game<CycladesState> = {
         // Сильфида: завершить движение досрочно.
         endSylph: ({ G, playerID }) => {
           if (endSylph(G, playerID!)) return INVALID_MOVE;
+        },
+
+        // Кракен: переплыть в соседнюю зону (1🪙, топит флот).
+        krakenStep: ({ G, playerID }, toId: TId) => {
+          if (applyKrakenStep(G, playerID!, toId)) return INVALID_MOVE;
+        },
+        // Кракен: завершить перемещение досрочно.
+        endKraken: ({ G, playerID }) => {
+          if (endKraken(G, playerID!)) return INVALID_MOVE;
         },
 
         // Полифем: отодвинуть соседний флот от острова.

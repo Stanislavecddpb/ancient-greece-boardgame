@@ -198,9 +198,9 @@ export function endCycle(G: CycladesState, ctx: Ctx): void {
   }
   // Рынок существ сдвигается на одну позицию в конце раунда.
   advanceCreatureMarket(G.creatures);
-  // Подстраховка: убираем фигуры существ старше текущего цикла.
-  cleanupBoardCreatures(G);
 
   G.startIndex = (G.startIndex + 1) % ctx.playOrder.length;
   G.cycle += 1;
+  // Убираем фигуры существ после инкремента цикла — теперь правильно снимаем прошлый цикл.
+  cleanupBoardCreatures(G);
 }

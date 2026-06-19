@@ -67,10 +67,35 @@ export function GodBoard({ G, ctx, me, moves, nameOf }: Props) {
 
       <div className="gb-gods">
         {cycleGods.map((god) => (
-          <GodSlot key={god} god={god} G={G} phase={phase} me={me} moves={moves} name={name} />
+          <GodRow key={god} god={god} G={G} phase={phase} me={me} moves={moves} name={name} />
         ))}
-        <GodSlot god="apollo" G={G} phase={phase} me={me} moves={moves} name={name} />
+        <GodRow god="apollo" G={G} phase={phase} me={me} moves={moves} name={name} />
       </div>
+    </div>
+  );
+}
+
+/** Кто «владеет» богом сейчас: ставка в аукционе или победитель в фазе действий. */
+function godOwnerId(G: CycladesState, phase: string | null, god: GodName): string | null {
+  if (phase === 'auction') return G.auction?.slots.find((s) => s.god === god)?.occupantId ?? null;
+  if (phase === 'actions' && G.actions) return G.actions.queue.find((t) => t.god === god)?.playerId ?? null;
+  return null;
+}
+
+/** Строка бога: слева — крупный кружок игрока (кто подкупил/исполняет), справа — карта бога. */
+function GodRow({ god, G, phase, me, moves, name }: {
+  god: GodName; G: CycladesState; phase: string | null; me: string | null; moves: any; name: (pid: string) => string;
+}) {
+  const ownerId = godOwnerId(G, phase, god);
+  const owner = ownerId ? G.players[ownerId] : null;
+  const activeTurn = G.actions ? G.actions.queue[G.actions.index] : null;
+  const isActiveGod = phase === 'actions' && activeTurn?.god === god;
+  return (
+    <div className="god-row">
+      <div className={`god-owner-dot ${owner ? 'filled' : ''} ${isActiveGod ? 'acting' : ''}`}
+        style={owner ? { background: owner.color } : undefined}
+        title={owner ? name(ownerId!) : 'свободен'} />
+      <GodSlot god={god} G={G} phase={phase} me={me} moves={moves} name={name} />
     </div>
   );
 }

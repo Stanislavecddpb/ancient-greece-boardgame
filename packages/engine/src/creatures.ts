@@ -345,7 +345,51 @@ function placeCreatureFigure(G: CycladesState, pid: PlayerID, kind: string, targ
       sea.ownerId = null;
       log(G, `Кракен топит флот в ${sea.name}.`);
     }
+    // Открываем перемещение Кракена: до (золото) клеток по 1🪙 за клетку.
+    G.krakenMove = { playerId: pid, at: targetId, stepsLeft: G.players[pid].gold };
   }
+}
+
+/**
+ * Кракен: переплывает в соседнюю морскую зону за 1 GP, топя там весь встреченный флот.
+ * Фигура и запретная зона следуют за Кракеном. Возвращает текст ошибки или null.
+ */
+export function applyKrakenStep(G: CycladesState, pid: PlayerID, toSeaId: string): string | null {
+  const m = G.krakenMove;
+  if (!m || m.playerId !== pid) return 'нет движения Кракена';
+  if (m.stepsLeft <= 0) return 'перемещения закончились';
+  const from = G.territories[m.at];
+  const to = G.territories[toSeaId];
+  if (!from || !isSea(from)) return 'Кракен не в море';
+  if (!to || !isSea(to)) return 'цель — не море';
+  if (!from.adjacentSeas.includes(toSeaId)) return 'не соседняя клетка';
+  if (G.players[pid].gold < 1) return 'нужна 1 монета';
+  // В целевой зоне не должно быть другой фигуры существа.
+  if (G.boardCreatures.some((c) => c.location === toSeaId && c.kind !== 'kraken')) return 'там фигура другого существа';
+
+  G.players[pid].gold -= 1;
+  // Топим весь флот в целевой зоне (возвращается владельцу в запас).
+  if (to.fleets > 0 && to.ownerId) {
+    G.players[to.ownerId].fleetsSupply = Math.min(UNIT_SUPPLY, G.players[to.ownerId].fleetsSupply + to.fleets);
+    log(G, `Кракен топит флот в ${to.name}.`);
+    to.fleets = 0;
+    to.ownerId = null;
+  }
+  // Двигаем фигуру Кракена.
+  const fig = G.boardCreatures.find((c) => c.kind === 'kraken' && c.location === m.at);
+  if (fig) fig.location = toSeaId;
+  m.at = toSeaId;
+  m.stepsLeft -= 1;
+  log(G, `${G.players[pid].name}: Кракен переплывает в ${to.name} (−1🪙).`);
+  if (m.stepsLeft <= 0 || G.players[pid].gold < 1) G.krakenMove = null;
+  return null;
+}
+
+/** Завершить перемещение Кракена досрочно. */
+export function endKraken(G: CycladesState, pid: PlayerID): string | null {
+  if (!G.krakenMove || G.krakenMove.playerId !== pid) return 'нет движения Кракена';
+  G.krakenMove = null;
+  return null;
 }
 
 /**

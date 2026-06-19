@@ -53,7 +53,7 @@ export function setupAuction(G: CycladesState, ctx: Ctx): void {
   const gods = godsForCycle(ctx.numPlayers, G.cycle);
   const slots: GodSlot[] = gods.map((god) => ({ god, occupantId: null, bid: 0 }));
   const starter = ctx.playOrder[G.startIndex % ctx.playOrder.length];
-  G.auction = { slots, apollo: [], toAct: starter };
+  G.auction = { slots, apollo: [], toAct: starter, lastDisplaced: null };
   log(G, `Цикл ${G.cycle}: аукцион богов начинается. Первым предлагает ${G.players[starter].name}.`);
 }
 
@@ -73,6 +73,10 @@ export function applyBid(
   const slot = a.slots.find((s) => s.god === god);
   if (!slot) return 'нет такого бога';
   if (slot.occupantId === pid) return 'вы уже стоите здесь';
+  // Перебитого только что игрока нельзя сразу вернуть на того же бога, с которого
+  // его согнали, — это вызывало бесконечную перестановку двоих на одном лоте.
+  if (a.lastDisplaced && a.lastDisplaced.pid === pid && a.lastDisplaced.god === god)
+    return 'нельзя сразу вернуться на того же бога — выберите другого или Аполлона';
   if (!Number.isInteger(amount) || amount < 1) return 'ставка должна быть >= 1';
   const minBid = slot.occupantId ? slot.bid + 1 : 1;
   if (amount < minBid) return `нужно минимум ${minBid}`;
@@ -88,7 +92,9 @@ export function applyBid(
   // Выбитый игрок переставляет ставку сразу же; иначе ход идёт дальше по кругу.
   if (displaced && displaced !== pid && !G.players[displaced].isEliminated) {
     a.toAct = displaced;
+    a.lastDisplaced = { pid: displaced, god }; // ему запрещено сразу вернуться сюда
   } else {
+    a.lastDisplaced = null;
     const next = nextToAct(G, ctx, pid);
     if (next) a.toAct = next;
   }
@@ -101,6 +107,7 @@ export function applyApollo(G: CycladesState, ctx: Ctx, pid: PlayerID): string |
   if (!a || pid !== a.toAct) return 'не ваш ход';
   for (const s of a.slots) if (s.occupantId === pid) { s.occupantId = null; s.bid = 0; }
   if (!a.apollo.includes(pid)) a.apollo.push(pid);
+  a.lastDisplaced = null; // ушёл под Аполлона — запрет на возврат больше не нужен
   const next = nextToAct(G, ctx, pid);
   if (next) a.toAct = next;
   return null;
