@@ -1,10 +1,11 @@
 import type { Island, Sea, Territory, TerritoryId, Point, LandCell, CornucopiaSpot } from './types';
 
-// Доска на 4 игроков по точной спецификации: круглое поле из строк клеток-кружков
-// сверху вниз 4,5,6,7,8,9,8,7,6,5,4. Координата клетки — (строка, номер в строке),
-// нумерация с 1. Связные клетки суши образуют острова; остальное — море.
+// Карта — круглое поле из строк клеток-кружков (плотная упаковка), нумерация
+// клеток (строка, номер в строке) с 1. Связные клетки суши образуют острова;
+// остальное — море. Геометрия каждого варианта собрана в MapConfig:
+//  • большая карта (2 и 4 игрока) — строки 4-5-6-7-8-9-8-7-6-5-4;
+//  • малая карта (3 игрока)       — строки 2-3-4-5-6-7-6-5-4-3-2.
 
-export const ROW_COUNTS = [4, 5, 6, 7, 8, 9, 8, 7, 6, 5, 4];
 export const CELL_D = 82; // расстояние между центрами соседних кружков
 const ROW_H = CELL_D * 0.866; // вертикальный шаг строк (плотная упаковка)
 export const BOARD_VIEWBOX = 900;
@@ -12,9 +13,74 @@ export const BOARD_CENTER: Point = { x: 450, y: 450 };
 export const BOARD_RADIUS = 400;
 const MID_ROW = 6;
 
+interface IslandDef {
+  id: TerritoryId;
+  name: string;
+  cells: [number, number][];
+}
+
+/** Полная геометрия одного варианта карты. */
+interface MapConfig {
+  rowCounts: number[];
+  islands: IslandDef[];
+  /** Рога изобилия: [строка, номер, количество]. */
+  cornucopias: Array<[number, number, number]>;
+}
+
+// --- Большая карта (2 и 4 игрока) ---
+const LARGE_MAP: MapConfig = {
+  rowCounts: [4, 5, 6, 7, 8, 9, 8, 7, 6, 5, 4],
+  // Острова — связные группы клеток суши. Число слотов застройки = число клеток.
+  islands: [
+    { id: 'home_n', name: 'Афины', cells: [[2, 1], [2, 2], [3, 1], [3, 2]] },
+    { id: 'home_e', name: 'Спарта', cells: [[3, 5], [3, 6]] },
+    { id: 'home_w', name: 'Коринф', cells: [[7, 1], [8, 1], [8, 2]] },
+    { id: 'home_s', name: 'Фивы', cells: [[7, 8], [8, 7], [9, 6], [10, 5]] },
+
+    { id: 'delos', name: 'Делос', cells: [[4, 4], [5, 5]] },
+    { id: 'naxos', name: 'Наксос', cells: [[6, 4], [7, 4]] },
+    { id: 'milos', name: 'Милос', cells: [[5, 2]] },
+    { id: 'paros', name: 'Парос', cells: [[5, 7]] },
+    { id: 'serifos', name: 'Серифос', cells: [[7, 6]] },
+    { id: 'thira', name: 'Тира', cells: [[9, 3], [10, 2], [10, 3]] },
+  ],
+  cornucopias: [
+    [1, 1, 1], [1, 4, 1], [6, 1, 1], [6, 9, 1], [11, 1, 1], [11, 4, 1], // вода (6 по краям)
+    [3, 5, 1], [5, 2, 2], [5, 5, 1], [5, 7, 2], [6, 4, 1], [7, 6, 2], // суша
+  ],
+};
+
+// --- Малая карта (3 игрока) ---
+// Строки 2-3-4-5-6-7-6-5-4-3-2. Острова и рога — по спецификации партии на 3.
+const SMALL_MAP: MapConfig = {
+  rowCounts: [2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2],
+  islands: [
+    { id: 'm_kea', name: 'Кеа', cells: [[2, 1]] },
+    { id: 'm_andros', name: 'Андрос', cells: [[3, 3], [3, 4]] },
+    { id: 'm_tinos', name: 'Тинос', cells: [[4, 2], [5, 3]] },
+    { id: 'm_mykonos', name: 'Миконос', cells: [[5, 5]] },
+    { id: 'm_syros', name: 'Сирос', cells: [[6, 2], [7, 1], [7, 2]] },
+    { id: 'm_rinia', name: 'Риния', cells: [[7, 4]] },
+    { id: 'm_naxos', name: 'Наксос', cells: [[7, 6], [8, 5], [9, 4], [10, 3]] },
+    { id: 'm_paros', name: 'Парос', cells: [[9, 1], [10, 1], [11, 1]] },
+  ],
+  cornucopias: [
+    [1, 2, 1], [6, 1, 1], [6, 7, 1], [11, 2, 1], // вода
+    [2, 1, 2], [3, 3, 1], [5, 3, 1], [5, 5, 2], [7, 4, 2], // суша
+  ],
+};
+
+/** Геометрия карты под число игроков: 3 — малая, иначе — большая. */
+export function mapConfigFor(numPlayers: number): MapConfig {
+  return numPlayers === 3 ? SMALL_MAP : LARGE_MAP;
+}
+
+/** Раскладка строк по умолчанию (большая карта) — для cellToPixel без явной карты. */
+export const ROW_COUNTS = LARGE_MAP.rowCounts;
+
 /** Пиксельная позиция центра клетки (row, col), нумерация с 1. */
-export function cellToPixel(row: number, col: number): Point {
-  const count = ROW_COUNTS[row - 1];
+export function cellToPixel(row: number, col: number, rowCounts: number[] = ROW_COUNTS): Point {
+  const count = rowCounts[row - 1];
   return {
     x: BOARD_CENTER.x + (col - (count + 1) / 2) * CELL_D,
     y: BOARD_CENTER.y + (row - MID_ROW) * ROW_H,
@@ -24,46 +90,6 @@ export function cellToPixel(row: number, col: number): Point {
 const ckey = (row: number, col: number) => `${row}_${col}`;
 const seaId = (row: number, col: number) => `s_${row}_${col}`;
 
-interface IslandDef {
-  id: TerritoryId;
-  name: string;
-  cells: [number, number][];
-}
-
-// Острова — связные группы клеток суши из спецификации.
-// Число слотов под застройку = число клеток острова.
-const ISLAND_DEFS: IslandDef[] = [
-  { id: 'home_n', name: 'Афины', cells: [[2, 1], [2, 2], [3, 1], [3, 2]] },
-  { id: 'home_e', name: 'Спарта', cells: [[3, 5], [3, 6]] },
-  { id: 'home_w', name: 'Коринф', cells: [[7, 1], [8, 1], [8, 2]] },
-  { id: 'home_s', name: 'Фивы', cells: [[7, 8], [8, 7], [9, 6], [10, 5]] },
-
-  { id: 'delos', name: 'Делос', cells: [[4, 4], [5, 5]] },
-  { id: 'naxos', name: 'Наксос', cells: [[6, 4], [7, 4]] },
-  { id: 'milos', name: 'Милос', cells: [[5, 2]] },
-  { id: 'paros', name: 'Парос', cells: [[5, 7]] },
-  { id: 'serifos', name: 'Серифос', cells: [[7, 6]] },
-  { id: 'thira', name: 'Тира', cells: [[9, 3], [10, 2], [10, 3]] },
-];
-
-// Рога изобилия: число рогов на клетке (строка, номер). 6 на воде по краям + на суше.
-const CORNUCOPIAS: Array<[number, number, number]> = [
-  [1, 1, 1], [1, 4, 1], [6, 1, 1], [6, 9, 1], [11, 1, 1], [11, 4, 1], // вода (6 по краям)
-  [3, 5, 1], [5, 2, 2], [5, 5, 1], [5, 7, 2], [6, 4, 1], [7, 6, 2], // суша
-];
-
-const HOME_ISLANDS: Record<number, TerritoryId[]> = {
-  2: ['home_n', 'home_s'],
-  3: ['home_n', 'home_e', 'home_w'],
-  4: ['home_n', 'home_e', 'home_w', 'home_s'],
-};
-
-export function homeIslandsFor(numPlayers: number): TerritoryId[] {
-  const list = HOME_ISLANDS[numPlayers];
-  if (!list) throw new Error(`Неподдерживаемое число игроков: ${numPlayers} (нужно 2–4)`);
-  return list;
-}
-
 function centroid(pts: Point[]): Point {
   return {
     x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
@@ -71,26 +97,29 @@ function centroid(pts: Point[]): Point {
   };
 }
 
-/** Создаёт свежую доску: море + острова со всей смежностью. */
-export function createBoard(): Record<TerritoryId, Territory> {
+/** Создаёт свежую доску под число игроков: море + острова со всей смежностью. */
+export function createBoard(numPlayers: number): Record<TerritoryId, Territory> {
+  const cfg = mapConfigFor(numPlayers);
+  const { rowCounts, islands, cornucopias } = cfg;
+
   // 1. Все клетки сетки с позициями.
   const cells: { row: number; col: number; pos: Point }[] = [];
-  ROW_COUNTS.forEach((count, ri) => {
+  rowCounts.forEach((count, ri) => {
     const row = ri + 1;
-    for (let col = 1; col <= count; col++) cells.push({ row, col, pos: cellToPixel(row, col) });
+    for (let col = 1; col <= count; col++) cells.push({ row, col, pos: cellToPixel(row, col, rowCounts) });
   });
 
   const cellToIsland = new Map<string, TerritoryId>();
-  for (const def of ISLAND_DEFS) for (const [r, c] of def.cells) cellToIsland.set(ckey(r, c), def.id);
+  for (const def of islands) for (const [r, c] of def.cells) cellToIsland.set(ckey(r, c), def.id);
 
   const cornById = new Map<string, number>();
-  for (const [r, c, n] of CORNUCOPIAS) cornById.set(ckey(r, c), (cornById.get(ckey(r, c)) ?? 0) + n);
+  for (const [r, c, n] of cornucopias) cornById.set(ckey(r, c), (cornById.get(ckey(r, c)) ?? 0) + n);
 
   const territories: Record<TerritoryId, Territory> = {};
 
   // 2. Острова.
-  for (const def of ISLAND_DEFS) {
-    const landCells: LandCell[] = def.cells.map(([row, col]) => ({ row, col, pos: cellToPixel(row, col) }));
+  for (const def of islands) {
+    const landCells: LandCell[] = def.cells.map(([row, col]) => ({ row, col, pos: cellToPixel(row, col, rowCounts) }));
     const spots: CornucopiaSpot[] = [];
     let cornTotal = 0;
     for (const lc of landCells) {

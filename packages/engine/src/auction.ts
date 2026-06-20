@@ -9,11 +9,26 @@ import {
 import { log, islandsOf } from './helpers';
 
 /**
- * Боги, выставляемые на аукцион в этом цикле: numPlayers конкурентных богов
- * (с ротацией по циклам) + Аполлон всегда доступен отдельно. При 4 игроках
- * выставляются все четыре конкурентных бога.
+ * Боги, выставляемые на аукцион в этом цикле (Аполлон всегда доступен отдельно).
+ *
+ *  • 3 игрока (малая карта): каждый цикл случайно открываются ровно 2 из 4
+ *    конкурентных богов. Случаен только выбор — порядок исполнения остаётся
+ *    каноническим (Арес → Посейдон → Зевс → Афина).
+ *  • иначе (большая карта): numPlayers − 1 конкурентных богов с ротацией по
+ *    циклам (при 4 игроках — все четыре).
  */
-export function godsForCycle(numPlayers: number, cycle: number): GodName[] {
+export function godsForCycle(
+  numPlayers: number,
+  cycle: number,
+  shuffle?: <T>(a: T[]) => T[],
+): GodName[] {
+  if (numPlayers === 3) {
+    // Случайные 2 бога; без shuffle (например, в тестах) — первые два канонически.
+    const order = shuffle ? shuffle([...COMPETITIVE_GODS]) : [...COMPETITIVE_GODS];
+    const chosen = new Set<GodName>(order.slice(0, 2));
+    return COMPETITIVE_GODS.filter((g) => chosen.has(g));
+  }
+
   // Всего открыто богов = числу игроков, включая Аполлона. Значит конкурентных
   // (не-Аполлон) богов выставляется numPlayers − 1.
   const count = Math.min(numPlayers - 1, COMPETITIVE_GODS.length);
@@ -48,9 +63,12 @@ export function nextToAct(G: CycladesState, ctx: Ctx, fromPid: PlayerID): Player
   return null;
 }
 
+/** Доступ к перемешиванию из плагина random boardgame.io (опционально). */
+interface RandomAPI { Shuffle?: <T>(a: T[]) => T[] }
+
 /** Готовит состояние аукциона в начале фазы. */
-export function setupAuction(G: CycladesState, ctx: Ctx): void {
-  const gods = godsForCycle(ctx.numPlayers, G.cycle);
+export function setupAuction(G: CycladesState, ctx: Ctx, random?: RandomAPI): void {
+  const gods = godsForCycle(ctx.numPlayers, G.cycle, random?.Shuffle);
   const slots: GodSlot[] = gods.map((god) => ({ god, occupantId: null, bid: 0 }));
   const starter = ctx.playOrder[G.startIndex % ctx.playOrder.length];
   G.auction = { slots, apollo: [], toAct: starter, lastDisplaced: null };

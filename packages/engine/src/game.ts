@@ -72,9 +72,9 @@ export const CycladesGame: Game<CycladesState> = {
     // по очереди делают подношения богам.
     auction: {
       next: 'actions',
-      onBegin: ({ G, ctx }) => {
+      onBegin: ({ G, ctx, random }) => {
         applyIncome(G);
-        setupAuction(G, ctx);
+        setupAuction(G, ctx, random);
       },
       endIf: ({ G, ctx }) => auctionComplete(G, ctx),
       onEnd: ({ G, ctx }) => {
