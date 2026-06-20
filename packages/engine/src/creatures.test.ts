@@ -33,7 +33,7 @@ function ctxFor(n: number): Ctx {
 
 /** Готовит состояние с фазой действий и фиксированным рынком существ. */
 function withMarket(market: string[], deck: string[] = ['fates', 'giant', 'dryad']): CycladesState {
-  const G = setupGame(ctxFor(2));
+  const G = setupGame(ctxFor(4));
   G.creatures = { deck: [...deck], market: [...market], discard: [] };
   G.actions = { queue: [{ god: 'zeus', playerId: '0' }], index: 0, recruited: 0, built: false };
   return G;
@@ -142,7 +142,7 @@ describe('фигуры существ на доске', () => {
   });
 
   it('две фигуры на одной клетке уничтожают друг друга', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     placeBoardCreature(G, 'minotaur', '0', 'home_n');
     expect(G.boardCreatures).toHaveLength(1);
     placeBoardCreature(G, 'chiron', '1', 'home_n');
@@ -150,7 +150,7 @@ describe('фигуры существ на доске', () => {
   });
 
   it('фигура снимается в начале хода владельца в следующем цикле', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     placeBoardCreature(G, 'minotaur', '0', 'home_n'); // placedCycle = 1
     G.cycle = 2;
     expireBoardCreatures(G, '1'); // чужой ход — не снимает

@@ -4,7 +4,6 @@ import {
   type GodName,
   type ActionTurn,
   type TerritoryId,
-  COMPETITIVE_GODS,
   GOD_BUILDING,
   MAX_RECRUIT_PER_TURN,
   BUILDING_COST,
@@ -37,14 +36,17 @@ export function recruitCost(god: GodName, recruited: number): number {
   return cfg.costs[Math.min(recruited, cfg.costs.length - 1)];
 }
 
-/** Собирает очередь исполнения из результатов аукциона и запускает фазу действий. */
+/**
+ * Собирает очередь исполнения из результатов аукциона и запускает фазу действий.
+ * Порядок очереди = порядок слотов аукциона (канонический для 2/3/4 игроков,
+ * случайный для 5 — задаётся при setupAuction).
+ */
 export function startActionsPhase(G: CycladesState): void {
   const a = G.auction;
   const queue: ActionTurn[] = [];
   if (a) {
-    for (const god of COMPETITIVE_GODS) {
-      const slot = a.slots.find((s) => s.god === god && s.occupantId);
-      if (slot && slot.occupantId) queue.push({ god, playerId: slot.occupantId });
+    for (const slot of a.slots) {
+      if (slot.occupantId) queue.push({ god: slot.god, playerId: slot.occupantId });
     }
   }
   G.actions = { queue, index: 0, recruited: 0, built: false, creatureBought: false, creatureCycled: false };

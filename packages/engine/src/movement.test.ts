@@ -31,7 +31,7 @@ describe('приказ флоту (Посейдон)', () => {
   }
 
   it('переход в соседнюю пустую клетку стоит 1 монету', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 5;
     const { a, b } = adjEmpty(G);
     const moved = a.fleets;
@@ -43,14 +43,14 @@ describe('приказ флоту (Посейдон)', () => {
   });
 
   it('нельзя начать приказ без монеты', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     const { a } = adjEmpty(G);
     G.players['0'].gold = 0;
     expect(startFleetMove(G, '0', a.id)).toBe('нужна 1 монета');
   });
 
   it('высадка по пути: часть кораблей остаётся, часть идёт дальше', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 5;
     // Строим цепочку из трёх своих/пустых клеток a→b→c.
     const a = freshSeas(G).find((s) => {
@@ -72,7 +72,7 @@ describe('приказ флоту (Посейдон)', () => {
   });
 
   it('дальность ограничена 3 переходами', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 9;
     const own = freshSeas(G).find((s) => s.ownerId === '0' && s.fleets > 0)!;
     expect(startFleetMove(G, '0', own.id)).toBeNull();
@@ -80,7 +80,7 @@ describe('приказ флоту (Посейдон)', () => {
   });
 
   it('морской бой: перевес атакующего захватывает клетку', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 5;
     const a = freshSeas(G).find((s) => s.adjacentSeas.some((nb) => { const t = G.territories[nb]; return t && isSea(t); }))!;
     const bId = a.adjacentSeas.find((nb) => { const t = G.territories[nb]; return t && isSea(t); })!;
@@ -100,7 +100,7 @@ describe('приказ флоту (Посейдон)', () => {
 
 describe('движение войск', () => {
   it('войска ходят по мосту из флотов и захватывают вражеский остров', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     const home = G.territories['home_n'];
     if (!isIsland(home)) throw new Error('home');
     home.ownerId = '0'; home.troops = 3;
@@ -127,7 +127,7 @@ describe('движение войск', () => {
   });
 
   it('Минотавр на острове даёт +2 к защите при штурме', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 5;
     const home = G.territories['home_n'];
     if (!isIsland(home)) throw new Error('home');
@@ -151,7 +151,7 @@ describe('движение войск', () => {
 
 describe('интерактивный бой', () => {
   function setupNavalFight() {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 5;
     const a = freshSeas(G).find((s) => s.adjacentSeas.some((nb) => isSea(G.territories[nb])))!;
     const bId = a.adjacentSeas.find((nb) => isSea(G.territories[nb]))!;
@@ -188,7 +188,7 @@ describe('интерактивный бой', () => {
 
 describe('фигуры существ в движении', () => {
   it('Медуза запрещает уводить войска с острова', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     const home = G.territories['home_n'];
     if (!isIsland(home)) throw new Error('home');
     home.ownerId = '0'; home.troops = 3;
@@ -203,7 +203,7 @@ describe('фигуры существ в движении', () => {
   });
 
   it('Кракен закрывает морскую зону для флота', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 5;
     const a = freshSeas(G).find((s) => s.adjacentSeas.some((nb) => isSea(G.territories[nb])))!;
     const bId = a.adjacentSeas.find((nb) => isSea(G.territories[nb]))!;
@@ -214,7 +214,7 @@ describe('фигуры существ в движении', () => {
   });
 
   it('Сильфида двигает по 1 кораблю и тратит бюджет', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.sylphMove = { playerId: '0', stepsLeft: 10 };
     const a = freshSeas(G).find((s) => s.adjacentSeas.some((nb) => { const t = G.territories[nb]; return isSea(t) && t.fleets === 0; }))!;
     const bId = a.adjacentSeas.find((nb) => { const t = G.territories[nb]; return isSea(t) && t.fleets === 0; })!;
@@ -227,7 +227,7 @@ describe('фигуры существ в движении', () => {
   });
 
   it('Полифем отталкивает соседний флот дальше от острова', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     let islId: string | null = null, adjId: string | null = null, destId: string | null = null;
     for (const cand of Object.values(G.territories)) {
       if (!isIsland(cand)) continue;
@@ -249,7 +249,7 @@ describe('фигуры существ в движении', () => {
   });
 
   it('Полифем не пускает флот в соседние зоны своего острова', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     G.players['0'].gold = 5;
     // ищем море, соседнее с островом, и своё море рядом с этим морем
     const isl = Object.values(G.territories).find(isIsland)!;

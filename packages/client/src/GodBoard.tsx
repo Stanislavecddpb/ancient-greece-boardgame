@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   type CycladesState,
   type GodName,
-  COMPETITIVE_GODS,
 } from '@cyclades/engine';
 
 interface GodData {
@@ -52,10 +51,11 @@ export function GodBoard({ G, ctx, me, moves, nameOf }: Props) {
   const name = nameOf ?? ((pid: string) => G.players[pid]?.name ?? pid);
   const auction = G.auction;
   const phase = ctx.phase;
+  // Порядок отображения = порядок слотов/очереди (для 5 игроков он случаен).
   const cycleGods: GodName[] = auction
     ? auction.slots.map((s) => s.god)
     : G.actions
-      ? COMPETITIVE_GODS.filter((g) => G.actions!.queue.some((t) => t.god === g))
+      ? G.actions.queue.map((t) => t.god)
       : [];
 
   return (

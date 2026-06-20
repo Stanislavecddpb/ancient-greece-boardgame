@@ -127,13 +127,37 @@ describe('боги на 3 игрока — случайные 2', () => {
     expect(godsForCycle(3, 1, pick as <T>(x: T[]) => T[])).toEqual(['ares', 'athena']);
   });
 
-  it('у 2 и 4 игроков логика богов не изменилась', () => {
+  it('у 4 игроков логика богов не изменилась (3 бога, ротация)', () => {
     expect(godsForCycle(4, 1)).toEqual(['ares', 'poseidon', 'zeus']);
-    expect(godsForCycle(2, 1)).toEqual(['ares']);
-    expect(godsForCycle(2, 2)).toEqual(['poseidon']);
+    expect(godsForCycle(4, 2)).toEqual(['poseidon', 'zeus', 'athena']);
   });
 
   it('выбранные боги входят в набор конкурентных', () => {
     for (const g of godsForCycle(3, 3)) expect(COMPETITIVE_GODS).toContain(g);
+  });
+});
+
+describe('режим на 2 игрока (та же малая карта)', () => {
+  it('2 игрока на малой карте: цвета жёлтый и чёрный', () => {
+    const G = setupGame(ctxFor(2));
+    expect(Object.keys(G.players)).toHaveLength(2);
+    expect(G.players['0'].color).toBe(PLAYER_COLORS[3]); // жёлтый
+    expect(G.players['1'].color).toBe(PLAYER_COLORS[1]); // чёрный
+    // Жёлтый на Кеа (2,1) и Наксосе (9,4); чёрный на Андросе (3,3) и Паросе (10,1).
+    expect(islandAtCell(G.territories, 2, 1)?.ownerId).toBe('0');
+    expect(islandAtCell(G.territories, 9, 4)?.ownerId).toBe('0');
+    expect(islandAtCell(G.territories, 3, 3)?.ownerId).toBe('1');
+    expect(islandAtCell(G.territories, 10, 1)?.ownerId).toBe('1');
+    const fleets = Object.values(G.territories).filter((x) => x.kind === 'sea' && x.fleets > 0);
+    expect(fleets).toHaveLength(4);
+  });
+
+  it('боги: ровно 1 случайный конкурентный бог за цикл', () => {
+    expect(godsForCycle(2, 1)).toEqual(['ares']); // без shuffle — первый
+    const reverse = <T,>(a: T[]) => [...a].reverse();
+    const gods = godsForCycle(2, 1, reverse);
+    expect(gods).toHaveLength(1);
+    expect(gods).toEqual(['athena']); // последний после reverse
+    expect(COMPETITIVE_GODS).toContain(gods[0]);
   });
 });

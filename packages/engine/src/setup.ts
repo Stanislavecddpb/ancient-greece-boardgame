@@ -29,6 +29,12 @@ const LARGE_PLACEMENTS: Placement[] = [
   { color: PLAYER_COLORS[3], soldiers: [[5, 5], [10, 2]], ships: [[6, 5], [11, 1]] }, // жёлтый
 ];
 
+// Малая карта, 2 игрока: место 0 — жёлтый, 1 — чёрный.
+const SMALL_2P_PLACEMENTS: Placement[] = [
+  { color: PLAYER_COLORS[3], soldiers: [[2, 1], [9, 4]], ships: [[2, 2], [7, 5]] }, // жёлтый
+  { color: PLAYER_COLORS[1], soldiers: [[3, 3], [10, 1]], ships: [[4, 4], [11, 2]] }, // чёрный
+];
+
 // Малая карта (3 игрока): место 0 — синий, 1 — жёлтый, 2 — чёрный.
 const SMALL_PLACEMENTS: Placement[] = [
   { color: PLAYER_COLORS[2], soldiers: [[4, 2], [10, 1]], ships: [[6, 4], [11, 2]] }, // синий
@@ -36,8 +42,20 @@ const SMALL_PLACEMENTS: Placement[] = [
   { color: PLAYER_COLORS[1], soldiers: [[3, 3], [6, 2]], ships: [[4, 4], [6, 1]] }, // чёрный
 ];
 
+// Карта на 5 игроков: синий, жёлтый, чёрный, красный, зелёный.
+const FIVE_PLACEMENTS: Placement[] = [
+  { color: PLAYER_COLORS[2], soldiers: [[4, 9], [8, 1]], ships: [[6, 1], [4, 8]] }, // синий
+  { color: PLAYER_COLORS[3], soldiers: [[5, 2], [8, 9]], ships: [[6, 3], [7, 9]] }, // жёлтый
+  { color: PLAYER_COLORS[1], soldiers: [[4, 4], [10, 5]], ships: [[6, 5], [11, 6]] }, // чёрный
+  { color: PLAYER_COLORS[0], soldiers: [[2, 1], [6, 7]], ships: [[2, 3], [5, 7]] }, // красный
+  { color: PLAYER_COLORS[4], soldiers: [[1, 4], [10, 2]], ships: [[3, 6], [11, 1]] }, // зелёный
+];
+
 function placementsFor(numPlayers: number): Placement[] {
-  return numPlayers === 3 ? SMALL_PLACEMENTS : LARGE_PLACEMENTS;
+  if (numPlayers === 2) return SMALL_2P_PLACEMENTS;
+  if (numPlayers === 3) return SMALL_PLACEMENTS;
+  if (numPlayers === 5) return FIVE_PLACEMENTS;
+  return LARGE_PLACEMENTS;
 }
 
 /** Строит начальное состояние партии под число игроков из ctx. */

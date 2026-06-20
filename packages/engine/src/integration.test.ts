@@ -85,28 +85,31 @@ describe('интеграция фаз через boardgame.io', () => {
   it('победитель аукциона исполняет действия и завершает свой ход', () => {
     const client = makeClient(2);
     startGame(client);
-    // Первый ходящий берёт Ареса, второй — Аполлона (в очереди действий только Арес).
+    // 2 игрока: открыт один случайный бог. Первый берёт его, второй — Аполлона.
     const first = client.getState()!.ctx.currentPlayer;
-    client.moves.bidGod('ares', 1);
+    const god = client.getState()!.G.auction!.slots[0].god;
+    client.moves.bidGod(god, 1);
     client.moves.chooseApollo();
 
     let s = client.getState()!;
     expect(s.ctx.phase).toBe('actions');
     expect(s.G.actions!.queue).toHaveLength(1);
-    expect(s.G.actions!.queue[0]).toEqual({ god: 'ares', playerId: first });
-    // Сначала «апполонец» ставит рог, затем ходит взявший Ареса.
+    expect(s.G.actions!.queue[0]).toEqual({ god, playerId: first });
+    // Сначала «апполонец» ставит рог, затем ходит взявший бога.
     const apolloPid = s.G.pendingCornucopia!;
     expect(s.ctx.currentPlayer).toBe(apolloPid);
     client.moves.placeCornucopia(islandOf(s.G, apolloPid));
     s = client.getState()!;
     expect(s.ctx.currentPlayer).toBe(first);
 
-    // Взявший Ареса строит крепость на своём острове и завершает активацию.
+    // Взявший бога строит здание на своём острове и завершает активацию.
     const myIsland = islandOf(s.G, first);
+    const islBefore = s.G.territories[myIsland];
+    const before = islBefore.kind === 'island' ? islBefore.buildings.length : 0;
     client.moves.build(myIsland);
     s = client.getState()!;
     const isl = s.G.territories[myIsland];
-    expect(isl.kind === 'island' && isl.buildings.some((b) => b.type === 'fortress')).toBe(true);
+    expect(isl.kind === 'island' && isl.buildings.length).toBe(before + 1);
 
     client.moves.endGod();
     s = client.getState()!;

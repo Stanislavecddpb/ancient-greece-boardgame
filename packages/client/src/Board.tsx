@@ -22,6 +22,7 @@ import {
   troopReachable,
   isIsland,
   isSea,
+  displayScaleFor,
 } from '@cyclades/engine';
 import type { CreatureDef, Territory } from '@cyclades/engine';
 import { BoardMap } from './BoardMap';
@@ -152,7 +153,7 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
     <div className="game">
       <div className="map-area">
         <div className="board-stage">
-          <BoardMap G={G} me={me} selected={selected} onSelect={setSelected} movement={movement} />
+          <BoardMap G={G} me={me} selected={selected} onSelect={setSelected} movement={movement} scale={displayScaleFor(ctx.numPlayers)} />
           <PlayersCorners G={G} ctx={ctx} activeId={activeId} me={me} nameOf={nameOf} />
         </div>
         <MarketColumn G={G} me={me} />

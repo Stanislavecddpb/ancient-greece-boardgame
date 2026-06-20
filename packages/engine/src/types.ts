@@ -330,5 +330,5 @@ export const PHILOSOPHERS_FOR_METROPOLIS = 4;
 /** Стартовое золото игрока. */
 export const STARTING_GOLD = 5;
 
-/** Цвета игроков по индексу посадки: красный, чёрный, синий, жёлтый. */
-export const PLAYER_COLORS = ['#d64545', '#3b414b', '#3b7dd8', '#e0b341'];
+/** Цвета игроков по индексу посадки: красный, чёрный, синий, жёлтый, зелёный. */
+export const PLAYER_COLORS = ['#d64545', '#3b414b', '#3b7dd8', '#e0b341', '#3f9b4f'];

@@ -14,6 +14,7 @@ import {
 import { applyRecruit, applyBuild, advanceTurn } from './actions';
 import { checkMetropolis, applyPlaceMetropolis } from './metropolis';
 import { metropolisCount, islandsOf, freeSlots } from './helpers';
+import { islandAtCell } from './board';
 import { CycladesGame } from './game';
 import type { CycladesState } from './types';
 
@@ -31,18 +32,19 @@ function ctxFor(n: number): Ctx {
 }
 
 describe('setup', () => {
-  it('раздаёт домашние острова, золото и стартовые юниты (2 игрока)', () => {
+  it('раздаёт острова, золото и стартовые юниты (2 игрока, малая карта)', () => {
     const ctx = ctxFor(2);
     const G = setupGame(ctx);
     expect(Object.keys(G.players)).toHaveLength(2);
     expect(G.players['0'].gold).toBe(5);
-    // Красный (0) ставит войска на Афины (2,1) и Серифос (7,6).
-    expect(G.territories['home_n'].kind === 'island' && G.territories['home_n'].ownerId).toBe('0');
-    expect(G.territories['serifos'].kind === 'island' && G.territories['serifos'].ownerId).toBe('0');
-    // Чёрный (1) — на Спарту (3,5) и Коринф (7,1).
-    expect(G.territories['home_e'].kind === 'island' && G.territories['home_e'].ownerId).toBe('1');
-    const ath = G.territories['home_n'];
-    if (ath.kind === 'island') expect(ath.troops).toBe(1);
+    // Жёлтый (0): войска на Кеа (2,1) и Наксосе (9,4).
+    expect(islandAtCell(G.territories, 2, 1)?.ownerId).toBe('0');
+    expect(islandAtCell(G.territories, 9, 4)?.ownerId).toBe('0');
+    // Чёрный (1): Андрос (3,3) и Парос (10,1).
+    expect(islandAtCell(G.territories, 3, 3)?.ownerId).toBe('1');
+    expect(islandAtCell(G.territories, 10, 1)?.ownerId).toBe('1');
+    const kea = islandAtCell(G.territories, 2, 1);
+    expect(kea?.troops).toBe(1);
     // По 2 флота у каждого из 2 игроков.
     const fleets = Object.values(G.territories).filter((t) => t.kind === 'sea' && t.fleets > 0);
     expect(fleets).toHaveLength(4);
@@ -71,18 +73,19 @@ describe('доход', () => {
     expect(G.players['0'].gold).toBe(5 + 1);
   });
 
-  it('всего на доске 6 рогов изобилия', () => {
-    const G = setupGame(ctxFor(2));
+  it('на стандартной карте (4 игрока) 6 морских рогов изобилия', () => {
+    const G = setupGame(ctxFor(4));
     const total = Object.values(G.territories).filter((t) => t.kind === 'sea' && t.cornucopia > 0).length;
     expect(total).toBe(6);
   });
 });
 
 describe('аукцион', () => {
-  it('godsForCycle выдаёт (игроки−1) богов и ротируется по циклам', () => {
-    expect(godsForCycle(4, 1)).toEqual(['ares', 'poseidon', 'zeus']);
+  it('godsForCycle: 2 — один бог, 4 — три (ротация), 5 — все четыре', () => {
+    // 2 игрока: один случайный бог; без shuffle — первый канонически, без ротации.
     expect(godsForCycle(2, 1)).toEqual(['ares']);
-    expect(godsForCycle(2, 2)).toEqual(['poseidon']);
+    expect(godsForCycle(2, 2)).toEqual(['ares']);
+    expect(godsForCycle(4, 1)).toEqual(['ares', 'poseidon', 'zeus']);
     expect(godsForCycle(5, 1)).toEqual(['ares', 'poseidon', 'zeus', 'athena']);
   });
 
@@ -171,7 +174,7 @@ describe('действия', () => {
   }
 
   it('наём войск: первый бесплатно, далее по растущей цене, из запаса', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     actionsState(G, 'ares');
     const gold0 = G.players['0'].gold;
@@ -186,14 +189,14 @@ describe('действия', () => {
   });
 
   it('нельзя нанимать войска на чужой остров', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     actionsState(G, 'ares');
     expect(applyRecruit(G, '0', 'ares', 'home_s')).not.toBeNull();
   });
 
   it('постройка здания стоит 2 и занимает слот; один раз за активацию', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     actionsState(G, 'ares');
     const gold0 = G.players['0'].gold;
@@ -207,7 +210,7 @@ describe('действия', () => {
 
 describe('Метрополия', () => {
   it('4 типа зданий автоматически дают Метрополию: здания расходуются, игрок выбирает остров', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     const home0 = G.territories['home_n'];
     if (home0.kind === 'island') {
@@ -222,7 +225,7 @@ describe('Метрополия', () => {
   });
 
   it('4 философа автоматически дают Метрополию (расходуются)', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     G.players['0'].philosophers = 4;
     checkMetropolis(G, '0');
@@ -233,7 +236,7 @@ describe('Метрополия', () => {
   });
 
   it('при нехватке места под Метрополию сносятся свои здания', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     const serifos = G.territories['serifos']; // 1 клетка
     if (serifos.kind === 'island') { serifos.ownerId = '0'; serifos.buildings = [{ type: 'temple', ownerId: '0' }]; }
@@ -247,7 +250,7 @@ describe('Метрополия', () => {
   });
 
   it('если все острова уже с Метрополией — ресурс просто сбрасывается (замена)', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     for (const isl of islandsOf(G, '0')) isl.hasMetropolis = true;
     const before = metropolisCount(G, '0');
@@ -259,7 +262,7 @@ describe('Метрополия', () => {
   });
 
   it('слоты: метрополия занимает 2 слота на острове ≥2 клеток, 1 — на одноклеточном', () => {
-    const G = setupGame(ctxFor(2));
+    const G = setupGame(ctxFor(4));
     const naxos = G.territories['naxos']; // 2 клетки
     const serifos = G.territories['serifos']; // 1 клетка
     if (naxos.kind === 'island') { naxos.ownerId = '0'; naxos.hasMetropolis = true; expect(freeSlots(naxos)).toBe(0); }
@@ -269,7 +272,7 @@ describe('Метрополия', () => {
 
 describe('победа', () => {
   it('endIf объявляет победителя при 2 Метрополиях между циклами', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     // Две Метрополии на островах игрока '0'.
     for (const id of ['home_n', 'naxos']) {
@@ -286,7 +289,7 @@ describe('победа', () => {
   });
 
   it('во время фазы действий победа не засчитывается', () => {
-    const ctx = ctxFor(2);
+    const ctx = ctxFor(4);
     const G = setupGame(ctx);
     for (const id of ['home_n', 'naxos']) {
       const isl = G.territories[id];

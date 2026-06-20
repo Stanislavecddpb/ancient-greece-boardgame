@@ -28,6 +28,8 @@ interface Props {
   selected: TerritoryId | null;
   onSelect: (id: TerritoryId) => void;
   movement?: MovementCtx | null;
+  /** Масштаб отрисовки доски (< 1 для широких карт) — сжимает клетки/фигуры к центру. */
+  scale?: number;
 }
 
 const SEA_R = CELL_D * 0.46;
@@ -65,16 +67,16 @@ function offsets(n: number, kind: 'troop' | 'fleet'): Array<{ x: number; y: numb
   return [{ x: -13, y: -9 }, { x: 13, y: -9 }, { x: -13, y: 9 }, { x: 13, y: 9 }];
 }
 
-export function BoardMap({ G, me, selected, onSelect, movement }: Props) {
+export function BoardMap({ G, me, selected, onSelect, movement, scale = 1 }: Props) {
   const territories = Object.values(G.territories);
   const islands = territories.filter(isIsland);
   const seas = territories.filter(isSea);
   const colorOf = (pid: string | null) => (pid ? G.players[pid].color : '#7c8aa0');
 
-  return (
-    <svg className="map" viewBox={`0 0 ${BOARD_VIEWBOX} ${BOARD_VIEWBOX}`} preserveAspectRatio="xMidYMid meet">
-      <SvgDefs />
-      <BoardFrame />
+  // Содержимое доски (клетки/острова/фигуры) — без диска-рамки, чтобы его можно
+  // было масштабировать к центру на широких картах, не трогая саму рамку.
+  const content = (
+    <>
       {seas.map((sea) => (
         <SeaCell key={sea.id} sea={sea} G={G} selected={selected === sea.id} color={colorOf(sea.ownerId)} onSelect={onSelect} />
       ))}
@@ -89,6 +91,17 @@ export function BoardMap({ G, me, selected, onSelect, movement }: Props) {
           color={G.players[bc.ownerId].color} emblem={CREATURES[bc.kind]?.emblem ?? '★'} />;
       })}
       {movement && <MovementLayer G={G} movement={movement} />}
+    </>
+  );
+
+  const c = BOARD_CENTER.x;
+  return (
+    <svg className="map" viewBox={`0 0 ${BOARD_VIEWBOX} ${BOARD_VIEWBOX}`} preserveAspectRatio="xMidYMid meet">
+      <SvgDefs />
+      <BoardFrame />
+      {scale === 1
+        ? content
+        : <g transform={`translate(${c} ${c}) scale(${scale}) translate(${-c} ${-c})`}>{content}</g>}
     </svg>
   );
 }

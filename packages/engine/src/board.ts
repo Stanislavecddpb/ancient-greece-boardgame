@@ -6,8 +6,7 @@ import type { Island, Sea, Territory, TerritoryId, Point, LandCell, CornucopiaSp
 //  • большая карта (2 и 4 игрока) — строки 4-5-6-7-8-9-8-7-6-5-4;
 //  • малая карта (3 игрока)       — строки 2-3-4-5-6-7-6-5-4-3-2.
 
-export const CELL_D = 82; // расстояние между центрами соседних кружков
-const ROW_H = CELL_D * 0.866; // вертикальный шаг строк (плотная упаковка)
+export const CELL_D = 82; // базовый размер клетки (и фигур) — шаг по умолчанию
 export const BOARD_VIEWBOX = 900;
 export const BOARD_CENTER: Point = { x: 450, y: 450 };
 export const BOARD_RADIUS = 400;
@@ -25,6 +24,12 @@ interface MapConfig {
   islands: IslandDef[];
   /** Рога изобилия: [строка, номер, количество]. */
   cornucopias: Array<[number, number, number]>;
+  /**
+   * Масштаб отрисовки доски (по умолчанию 1). Для широких карт < 1: позиции и
+   * фигуры считаются обычным шагом, а весь слой доски на клиенте сжимается вокруг
+   * центра, чтобы уместиться в диск (BOARD_RADIUS) без наложения клеток.
+   */
+  displayScale?: number;
 }
 
 // --- Большая карта (2 и 4 игрока) ---
@@ -70,20 +75,59 @@ const SMALL_MAP: MapConfig = {
   ],
 };
 
-/** Геометрия карты под число игроков: 3 — малая, иначе — большая. */
+// --- Карта на 5 игроков ---
+// Строки 6-7-8-9-10-11-10-9-8-7-6. 13 островов; шаг клетки сжат, чтобы 11
+// клеток в ряду уместились в диск доски.
+const FIVE_MAP: MapConfig = {
+  rowCounts: [6, 7, 8, 9, 10, 11, 10, 9, 8, 7, 6],
+  displayScale: 0.82,
+  islands: [
+    { id: 'f_andros', name: 'Андрос', cells: [[1, 4], [2, 5]] },
+    { id: 'f_evia', name: 'Эвбея', cells: [[2, 1], [2, 2], [3, 1], [3, 2]] },
+    { id: 'f_tinos', name: 'Тинос', cells: [[4, 4], [5, 5]] },
+    { id: 'f_mykonos', name: 'Миконос', cells: [[4, 6], [4, 7]] },
+    { id: 'f_delos', name: 'Делос', cells: [[6, 7]] },
+    { id: 'f_ikaria', name: 'Икария', cells: [[4, 9], [5, 9]] },
+    { id: 'f_kythnos', name: 'Кифнос', cells: [[5, 2]] },
+    { id: 'f_serifos', name: 'Серифос', cells: [[6, 4], [7, 4]] },
+    { id: 'f_milos', name: 'Милос', cells: [[7, 1], [8, 1], [8, 2]] },
+    { id: 'f_naxos', name: 'Наксос', cells: [[7, 10], [8, 9], [9, 8], [10, 7]] },
+    { id: 'f_paros', name: 'Парос', cells: [[8, 7]] },
+    { id: 'f_sifnos', name: 'Сифнос', cells: [[9, 3], [10, 2], [10, 3]] },
+    { id: 'f_ios', name: 'Иос', cells: [[9, 5], [10, 5], [11, 5]] },
+  ],
+  cornucopias: [
+    [1, 1, 1], [1, 6, 1], [6, 1, 1], [6, 11, 1], [11, 1, 1], [11, 6, 1], // вода
+    [1, 4, 1], [4, 6, 1], [5, 2, 2], [5, 5, 1], [5, 9, 1], [6, 4, 1], [6, 7, 2], [8, 7, 2], // суша
+  ],
+};
+
+/** Геометрия карты под число игроков: 2/3 — малая, 5 — большая, иначе — стандартная. */
 export function mapConfigFor(numPlayers: number): MapConfig {
-  return numPlayers === 3 ? SMALL_MAP : LARGE_MAP;
+  if (numPlayers === 2 || numPlayers === 3) return SMALL_MAP;
+  if (numPlayers === 5) return FIVE_MAP;
+  return LARGE_MAP;
 }
 
-/** Раскладка строк по умолчанию (большая карта) — для cellToPixel без явной карты. */
+/** Масштаб отрисовки доски под число игроков (1 — обычный, < 1 — сжатие). */
+export function displayScaleFor(numPlayers: number): number {
+  return mapConfigFor(numPlayers).displayScale ?? 1;
+}
+
+/** Раскладка строк по умолчанию (стандартная карта) — для cellToPixel без явной карты. */
 export const ROW_COUNTS = LARGE_MAP.rowCounts;
 
 /** Пиксельная позиция центра клетки (row, col), нумерация с 1. */
-export function cellToPixel(row: number, col: number, rowCounts: number[] = ROW_COUNTS): Point {
+export function cellToPixel(
+  row: number,
+  col: number,
+  rowCounts: number[] = ROW_COUNTS,
+  spacing: number = CELL_D,
+): Point {
   const count = rowCounts[row - 1];
   return {
-    x: BOARD_CENTER.x + (col - (count + 1) / 2) * CELL_D,
-    y: BOARD_CENTER.y + (row - MID_ROW) * ROW_H,
+    x: BOARD_CENTER.x + (col - (count + 1) / 2) * spacing,
+    y: BOARD_CENTER.y + (row - MID_ROW) * spacing * 0.866,
   };
 }
 
@@ -101,12 +145,13 @@ function centroid(pts: Point[]): Point {
 export function createBoard(numPlayers: number): Record<TerritoryId, Territory> {
   const cfg = mapConfigFor(numPlayers);
   const { rowCounts, islands, cornucopias } = cfg;
+  const spacing = CELL_D;
 
   // 1. Все клетки сетки с позициями.
   const cells: { row: number; col: number; pos: Point }[] = [];
   rowCounts.forEach((count, ri) => {
     const row = ri + 1;
-    for (let col = 1; col <= count; col++) cells.push({ row, col, pos: cellToPixel(row, col, rowCounts) });
+    for (let col = 1; col <= count; col++) cells.push({ row, col, pos: cellToPixel(row, col, rowCounts, spacing) });
   });
 
   const cellToIsland = new Map<string, TerritoryId>();
@@ -119,7 +164,7 @@ export function createBoard(numPlayers: number): Record<TerritoryId, Territory> 
 
   // 2. Острова.
   for (const def of islands) {
-    const landCells: LandCell[] = def.cells.map(([row, col]) => ({ row, col, pos: cellToPixel(row, col, rowCounts) }));
+    const landCells: LandCell[] = def.cells.map(([row, col]) => ({ row, col, pos: cellToPixel(row, col, rowCounts, spacing) }));
     const spots: CornucopiaSpot[] = [];
     let cornTotal = 0;
     for (const lc of landCells) {
@@ -166,8 +211,8 @@ export function createBoard(numPlayers: number): Record<TerritoryId, Territory> 
     territories[sea.id] = sea;
   }
 
-  // 4. Смежность по близости центров (соседи на расстоянии ~CELL_D).
-  const threshold = CELL_D * 1.15;
+  // 4. Смежность по близости центров (соседи на расстоянии ~spacing).
+  const threshold = spacing * 1.15;
   for (const cell of cells) {
     const islandId = cellToIsland.get(ckey(cell.row, cell.col));
     if (islandId) continue; // обрабатываем смежность от лица морских клеток
