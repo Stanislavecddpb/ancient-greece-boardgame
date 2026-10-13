@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Ctx } from 'boardgame.io';
-import { setupGame } from './setup';
+import { setupGame, applySetColor, applyShuffleColors } from './setup';
+import { PLAYER_COLORS } from './types';
 import { incomeFor, applyIncome } from './income';
 import {
   godsForCycle,
@@ -346,5 +347,30 @@ describe('очередь действий', () => {
     expect(G.actions!.recruited).toBe(0); // сброс на новой активации
     expect(advanceTurn(G)).toBe(true);
     expect(G.actions).toBeNull();
+  });
+});
+
+describe('цвета в лобби', () => {
+  it('игрок берёт свободный цвет; занятый и чужой — нельзя', () => {
+    const G = setupGame(ctxFor(3));
+    const taken = G.players['1'].color;
+    const free = PLAYER_COLORS.find((c) => !Object.values(G.players).some((p) => p.color === c))!;
+    expect(applySetColor(G, '2', '2', taken)).toBe('цвет уже занят');
+    expect(applySetColor(G, '2', '1', free)).toBe('можно менять только свой цвет');
+    expect(applySetColor(G, '2', '2', free)).toBeNull();
+    expect(G.players['2'].color).toBe(free);
+    expect(applySetColor(G, '0', '1', '#123456')).toBe('нет такого цвета');
+    G.started = true;
+    expect(applySetColor(G, '2', '2', free)).toBe('игра уже началась');
+  });
+
+  it('хост раздаёт случайные цвета — у всех разные', () => {
+    const G = setupGame(ctxFor(5));
+    const reverse = <T,>(a: T[]) => [...a].reverse();
+    expect(applyShuffleColors(G, '1', reverse)).toBe('цвета раздаёт хост');
+    expect(applyShuffleColors(G, '0', reverse)).toBeNull();
+    const colors = Object.values(G.players).map((p) => p.color);
+    expect(new Set(colors).size).toBe(5);
+    expect(G.players['0'].color).toBe(PLAYER_COLORS[4]);
   });
 });

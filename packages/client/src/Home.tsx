@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { lobby, GAME_ID, saveSeat, savedName, rememberName } from './net';
+import { GreekPage, PlayerCountPicker } from './GreekPage';
 
 export function Home() {
   const [name, setName] = useState(savedName() || 'Игрок');
@@ -34,36 +35,31 @@ export function Home() {
   }
 
   return (
-    <div className="home">
-      <h1>Cyclades</h1>
-      <p className="hint">Борьба за господство над островами Эгейского моря. Соберите 2 Метрополии.</p>
-
-      <div className="home-card">
+    <GreekPage subtitle="Борьба за господство над островами Эгейского моря. Возведите две Метрополии — и боги признают вас владыкой Киклад.">
+      <section className="greek-card">
+        <h2>Созвать игру</h2>
         <label>Ваше имя
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
         </label>
-
-        <label>Игроков
-          <select value={numPlayers} onChange={(e) => setNumPlayers(Number(e.target.value))}>
-            <option value={2}>2</option>
-            <option value={3}>3</option>
-            <option value={4}>4</option>
-            <option value={5}>5</option>
-          </select>
-        </label>
-
-        <button disabled={busy} onClick={createGame}>Создать игру</button>
+        <div className="greek-field">Игроков
+          <PlayerCountPicker value={numPlayers} onChange={setNumPlayers} />
+        </div>
+        <button className="greek-btn" disabled={busy} onClick={createGame}>
+          {busy ? 'Созываем…' : 'Создать игру'}
+        </button>
         {error && <div className="err">{error}</div>}
-      </div>
+      </section>
 
-      <div className="home-card">
-        <label>Код партии (от друга)
-          <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="например, W28urhFkUw7" />
+      <section className="greek-card">
+        <h2>Вступить в игру</h2>
+        <label>Код партии от друга
+          <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') joinByCode(); }} placeholder="например, W28urhFkUw7" />
         </label>
-        <button disabled={!joinCode.trim()} onClick={joinByCode}>Присоединиться</button>
-      </div>
+        <button className="greek-btn ghost" disabled={!joinCode.trim()} onClick={joinByCode}>Присоединиться</button>
+      </section>
 
-      <a className="local-link" href="#/local">Локальная игра за одним компьютером →</a>
-    </div>
+      <a className="greek-link" href="#/local">Локальная игра за одним компьютером →</a>
+    </GreekPage>
   );
 }

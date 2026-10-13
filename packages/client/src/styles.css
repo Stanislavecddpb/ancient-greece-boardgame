@@ -308,3 +308,101 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 
 .badge-txt { font-size: 11px; fill: #fff; text-anchor: middle; font-weight: 800; }
 .t-name { font-size: 13px; fill: #dce6f2; text-anchor: middle; font-weight: 700; }
+
+/* ===== Античные экраны вне партии: главная, комната, лобби ===== */
+.greek {
+  --gold: #c9a24f; --gold-hi: #f0d68a; --bronze: #8a6a2f; --terra: #b3532a; --parch: #efe6d0;
+  --key: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M0 24H24V4H8V16H16V11' fill='none' stroke='%23c9a24f' stroke-width='2.6'/%3E%3C/svg%3E");
+  min-height: 100vh; display: flex; flex-direction: column; color: var(--parch);
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 0%, #3a6387aa 0%, transparent 70%),
+    radial-gradient(ellipse 120% 60% at 50% 110%, #0c2a3fcc 0%, transparent 70%),
+    linear-gradient(#152c44, #0a1622);
+}
+.greek-meander { height: 28px; flex-shrink: 0; background: var(--key) repeat-x center / 28px 28px, #0a1622;
+  border-bottom: 1px solid var(--bronze); opacity: 0.85; }
+.greek-meander.bottom { margin-top: auto; border-bottom: none; border-top: 1px solid var(--bronze); transform: scaleY(-1); }
+.greek-main { width: 100%; max-width: 480px; margin: 0 auto; padding: 1.4rem 1rem 2rem; }
+.greek-main.wide { max-width: 620px; }
+
+.greek-head { text-align: center; margin-bottom: 1.2rem; }
+.greek-laurel { width: 84px; height: 56px; color: var(--gold); display: block; margin: 0 auto -6px; opacity: 0.9; }
+.greek-head h1 {
+  margin: 0; font-family: 'Forum', Georgia, 'Times New Roman', serif; font-weight: 400;
+  font-size: clamp(2.4rem, 9vw, 3.6rem); letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.05;
+  background: linear-gradient(#f7e3a3, #c9a24f 55%, #8a6a2f); -webkit-background-clip: text; background-clip: text;
+  color: transparent; filter: drop-shadow(0 2px 0 #0008);
+}
+.greek-sub { margin: 0.5rem auto 0; max-width: 34ch; font-size: 0.92rem; line-height: 1.45; opacity: 0.82; text-wrap: balance; }
+.greek-rule { display: flex; align-items: center; gap: 10px; margin: 0.9rem auto 0; max-width: 260px; color: var(--gold); font-size: 0.6rem; }
+.greek-rule::before, .greek-rule::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--bronze)); }
+.greek-rule::after { transform: scaleX(-1); }
+
+.greek-card {
+  position: relative; margin: 0 0 1rem; padding: 1.1rem 1.25rem 1.25rem;
+  display: flex; flex-direction: column; gap: 0.8rem;
+  background: linear-gradient(#17304aee, #0f2033ee); border: 1px solid var(--bronze); border-radius: 4px;
+  box-shadow: 0 0 0 3px #0a1622, 0 0 0 4px #8a6a2f66, 0 14px 30px #0007;
+}
+.greek-card h2 { margin: 0; font-family: 'Forum', Georgia, serif; font-weight: 400; font-size: 1.25rem;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold-hi); }
+.greek-card label, .greek-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.78rem;
+  letter-spacing: 0.06em; text-transform: uppercase; color: #cbb98a; }
+.greek-card input {
+  border-radius: 3px; border: 1px solid #3a4f66; border-bottom-color: var(--bronze); background: #0a1724;
+  color: var(--parch); padding: 0.55rem 0.65rem; font-size: 1rem; text-transform: none; letter-spacing: 0;
+}
+.greek-card input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.greek-card input::placeholder { color: #6f8196; }
+
+.greek-btn {
+  font-family: 'Forum', Georgia, serif; font-size: 1.05rem; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.6rem 1rem; border-radius: 3px; border: 1px solid var(--gold); color: #fff4d6;
+  background: linear-gradient(#c4622f, #93401d); box-shadow: 0 2px 0 #5e2810, 0 0 0 1px #0a1622 inset;
+  transition: filter 0.12s, transform 0.06s;
+}
+.greek-btn:not(:disabled):hover { filter: brightness(1.12); }
+.greek-btn:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 #5e2810, 0 0 0 1px #0a1622 inset; }
+.greek-btn:focus-visible, .greek-count button:focus-visible, .gs-swatch:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+.greek-btn.ghost { background: transparent; color: var(--gold-hi); box-shadow: none; }
+.greek-btn.ghost:not(:disabled):hover { background: #c9a24f1f; filter: none; }
+.greek-btn.small { font-size: 0.85rem; padding: 0.3rem 0.7rem; }
+.greek-btn:disabled { background: #22364b; border-color: #3a4f66; color: #7e93ab; box-shadow: none; }
+
+.greek-count { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.greek-count button { font-family: 'Forum', Georgia, serif; font-size: 1.25rem; padding: 0.4rem 0; border-radius: 3px;
+  background: #0a1724; border: 1px solid #3a4f66; color: #cbb98a; }
+.greek-count button:hover { border-color: var(--bronze); }
+.greek-count button.on { background: linear-gradient(#d9b866, #a8843a); border-color: var(--gold-hi); color: #1b1407; font-weight: 700; }
+
+.greek-link { display: block; text-align: center; margin-top: 0.4rem; color: var(--gold-hi); text-decoration: none;
+  font-size: 0.9rem; opacity: 0.85; }
+.greek-link:hover { opacity: 1; text-decoration: underline; }
+.greek-note { text-align: center; font-size: 0.9rem; opacity: 0.8; }
+.greek .err { text-align: center; }
+.greek .share code { background: #0a1724; border: 1px solid #3a4f66; border-radius: 3px; color: var(--parch); }
+
+/* места за столом и выбор цвета */
+.greek-seats { display: flex; flex-direction: column; gap: 7px; }
+.greek-seat { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-radius: 3px;
+  background: #0a1724; border: 1px solid #2a3d52; opacity: 0.6; }
+.greek-seat.taken { opacity: 1; border-left: 4px solid var(--pc, var(--bronze)); }
+.greek-seat.me { border-color: var(--gold); border-left-color: var(--pc, var(--gold)); }
+.gs-num { font-family: 'Forum', Georgia, serif; color: var(--gold); width: 1.6em; text-align: center; font-size: 1.05rem; }
+.gs-shield { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid #0a1622; box-shadow: 0 0 0 1.5px var(--gold); }
+.gs-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.gs-name i { opacity: 0.6; }
+.gs-colors { display: flex; gap: 5px; flex-shrink: 0; }
+.gs-swatch { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid #0a1622;
+  box-shadow: 0 0 0 1px #5b6b7d; transition: transform 0.1s; }
+.gs-swatch:not(:disabled):hover { transform: scale(1.15); }
+.gs-swatch.on { box-shadow: 0 0 0 2px var(--gold-hi); }
+.gs-swatch:disabled { opacity: 0.22; cursor: not-allowed; }
+.greek-actions { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+.greek-actions .greek-btn { flex: 1 1 180px; }
+@media (max-width: 480px) {
+  .greek-seat { flex-wrap: wrap; }
+  .gs-colors { width: 100%; justify-content: flex-end; }
+}
+@media (prefers-reduced-motion: reduce) { .greek-btn, .gs-swatch { transition: none; } }

@@ -8,6 +8,7 @@ import {
   GOD_BUILDING,
   BUILDING_COST,
   ALL_BUILDINGS,
+  PLAYER_COLORS,
   CREATURES,
   chimeraPlayable,
   creaturePriceAt,
@@ -33,6 +34,9 @@ import type { CreatureDef, Territory } from '@cyclades/engine';
 import { BoardMap } from './BoardMap';
 import type { MovementCtx } from './BoardMap';
 import { GodBoard } from './GodBoard';
+import { GreekPage, COLOR_NAMES } from './GreekPage';
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
 import { savedName } from './net';
 
 const GOD_EMOJI: Record<GodName, string> = {
@@ -425,35 +429,57 @@ function Lobby({ G, ctx, me, moves, matchData, nameOf }: {
     }
   }, []);
 
+  // Хотсит (нет matchData): хост настраивает цвета всем; в сети каждый — только себе.
+  const hotseat = !matchData;
+  const takenBy = (color: string) => Object.values(G.players).find((p) => p.color === color)?.id ?? null;
+
   return (
-    <div className="lobby">
-      <div className="lobby-card">
-        <h1>Cyclades</h1>
-        <p className="hint">Когда все сядут за стол, хост начинает игру.</p>
-        <div className="lobby-seats">
+    <GreekPage wide subtitle="Выберите цвет своих фишек. Когда все сядут за стол, хост начинает игру.">
+      <section className="greek-card">
+        <h2>За столом {filled} из {total}</h2>
+        <div className="greek-seats">
           {Array.from({ length: total }, (_, i) => {
             const pid = String(i);
             // В сети — имя из matchData (или «ожидание»); в хотсите — имя из состояния.
             const nm = matchData ? matchData.find((m) => m.id === i)?.name : G.players[pid].name;
+            const color = G.players[pid].color;
+            const canPick = !!nm && (pid === me || (hotseat && isHost));
             return (
-              <div key={i} className={`lobby-seat ${nm ? 'taken' : ''}`} style={{ ['--pc' as any]: G.players[pid].color }}>
-                <span className="ls-num">{i + 1}</span>
-                <span className="ls-dot" style={{ background: G.players[pid].color }} />
-                {nm ? <b>{nm}</b> : <i>ожидание…</i>}
+              <div key={i} className={`greek-seat ${nm ? 'taken' : ''} ${pid === me ? 'me' : ''}`} style={{ ['--pc' as any]: color }}>
+                <span className="gs-num">{ROMAN[i] ?? i + 1}</span>
+                <span className="gs-shield" style={{ background: color }} title={COLOR_NAMES[color] ?? ''} />
+                <span className="gs-name">{nm ? <b>{nm}</b> : <i>ожидание…</i>}{pid === me && !hotseat ? ' (вы)' : ''}</span>
+                {canPick && (
+                  <span className="gs-colors" role="radiogroup" aria-label="Цвет фишек">
+                    {PLAYER_COLORS.map((c) => {
+                      const holder = takenBy(c);
+                      const mine = holder === pid;
+                      return (
+                        <button key={c} type="button" role="radio" aria-checked={mine}
+                          className={`gs-swatch ${mine ? 'on' : ''}`} style={{ background: c }}
+                          disabled={!!holder && !mine}
+                          title={COLOR_NAMES[c] + (holder && !mine ? ' — занят' : '')}
+                          onClick={() => moves.setColor(c, pid)} />
+                      );
+                    })}
+                  </span>
+                )}
               </div>
             );
           })}
         </div>
-        <div className="lobby-status">{filled}/{total} игроков за столом</div>
         {isHost ? (
-          <button className="lobby-start" disabled={!full} onClick={() => moves.startGame()}>
-            {full ? '▶ Начать игру' : 'Ждём игроков…'}
-          </button>
+          <div className="greek-actions">
+            <button className="greek-btn ghost" onClick={() => moves.shuffleColors()}>🎲 Случайные цвета</button>
+            <button className="greek-btn" disabled={!full} onClick={() => moves.startGame()}>
+              {full ? '▶ Начать игру' : 'Ждём игроков…'}
+            </button>
+          </div>
         ) : (
-          <div className="hint">Ждём, пока хост начнёт игру…</div>
+          <div className="greek-note">Ждём, пока хост начнёт игру…</div>
         )}
-      </div>
-    </div>
+      </section>
+    </GreekPage>
   );
 }
 

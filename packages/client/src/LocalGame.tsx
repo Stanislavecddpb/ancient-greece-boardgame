@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 import { CycladesGame } from '@cyclades/engine';
 import { HotseatBoard } from './Board';
+import { GreekPage, PlayerCountPicker } from './GreekPage';
 
 // Хотсит: один экран, один клиент без сервера.
 // HotseatBoard сам определяет «меня» как ctx.currentPlayer,
@@ -24,24 +25,15 @@ export function LocalGame() {
 
   if (!started) {
     return (
-      <div className="home">
-        <h1>Локальная игра</h1>
-        <p className="hint">За одним компьютером — ходите по очереди за всех игроков.</p>
-
-        <div className="home-card">
-          <label>Игроков
-            <select value={numPlayers} onChange={(e) => setNumPlayers(Number(e.target.value))}>
-              <option value={2}>2</option>
-              <option value={3}>3</option>
-              <option value={4}>4</option>
-              <option value={5}>5</option>
-            </select>
-          </label>
-          <button onClick={() => setStarted(true)}>Начать</button>
-        </div>
-
-        <a className="local-link" href="#/">← На главную</a>
-      </div>
+      <GreekPage title="Локальная игра" subtitle="За одним компьютером — ходите по очереди за всех игроков.">
+        <section className="greek-card">
+          <div className="greek-field">Игроков
+            <PlayerCountPicker value={numPlayers} onChange={setNumPlayers} />
+          </div>
+          <button className="greek-btn" onClick={() => setStarted(true)}>Начать</button>
+        </section>
+        <a className="greek-link" href="#/">← На главную</a>
+      </GreekPage>
     );
   }
 

@@ -1,5 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
+import { GreekPage } from './GreekPage';
 import { lobby, GAME_ID, NetClient, loadSeat, saveSeat, savedName, rememberName, type Seat } from './net';
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
 
 interface MatchPlayer {
   id: number;
@@ -73,31 +76,33 @@ export function GameRoom({ matchID }: { matchID: string }) {
 
   // Ещё не выбрали место — рассадка.
   return (
-    <div className="home">
-      <h1>Комната {matchID}</h1>
-      <a href="#/" className="back">← на главную</a>
+    <GreekPage title="Сбор героев" subtitle={`Комната ${matchID} — займите место за столом.`}>
       {error && <div className="err">{error}</div>}
 
-      <div className="home-card">
+      <section className="greek-card">
+        <h2>Места</h2>
         <label>Ваше имя
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={20} />
         </label>
-        <div className="seat-list">
+        <div className="greek-seats">
           {players?.map((p) => (
-            <div key={p.id} className="seat-row">
-              <span>Место {p.id + 1}: {p.name ? <b>{p.name}</b> : <i>свободно</i>}</span>
-              {!p.name && <button onClick={() => take(p.id)}>Занять</button>}
+            <div key={p.id} className={`greek-seat ${p.name ? 'taken' : ''}`}>
+              <span className="gs-num">{ROMAN[p.id] ?? p.id + 1}</span>
+              <span className="gs-name">{p.name ? <b>{p.name}</b> : <i>свободно</i>}</span>
+              {!p.name && <button className="greek-btn small" onClick={() => take(p.id)}>Занять</button>}
             </div>
           ))}
-          {!players && <div>Загрузка…</div>}
+          {!players && <div className="greek-note">Загрузка…</div>}
         </div>
-      </div>
+      </section>
 
-      <div className="home-card">
-        <div className="hint">Ссылка для друзей:</div>
+      <section className="greek-card">
+        <h2>Позвать друзей</h2>
         <div className="share"><code>{shareUrl}</code></div>
-        <button onClick={copyLink}>{copied ? 'Скопировано!' : 'Скопировать ссылку'}</button>
-      </div>
-    </div>
+        <button className="greek-btn ghost" onClick={copyLink}>{copied ? 'Скопировано!' : 'Скопировать ссылку'}</button>
+      </section>
+
+      <a className="greek-link" href="#/">← На главную</a>
+    </GreekPage>
   );
 }

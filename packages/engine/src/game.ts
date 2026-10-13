@@ -2,7 +2,7 @@ import type { Game, Ctx } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 import type { CycladesState, TerritoryId, GodName } from './types';
 import { METROPOLIS_TO_WIN } from './types';
-import { setupGame } from './setup';
+import { setupGame, applySetColor, applyShuffleColors } from './setup';
 import { applyIncome } from './income';
 import {
   setupAuction,
@@ -70,6 +70,15 @@ export const CycladesGame: Game<CycladesState> = {
           if (!playerID || !G.players[playerID]) return INVALID_MOVE;
           const n = String(name).trim().slice(0, 20);
           if (n) G.players[playerID].name = n;
+        },
+        // Выбор цвета фишек: свой — любой игрок, чужой — только хост (хотсит).
+        setColor: ({ G, playerID }, color: string, forPid?: string) => {
+          if (!playerID) return INVALID_MOVE;
+          if (applySetColor(G, playerID, forPid ?? playerID, color)) return INVALID_MOVE;
+        },
+        // Хост раздаёт всем случайные цвета.
+        shuffleColors: ({ G, playerID, random }) => {
+          if (!playerID || applyShuffleColors(G, playerID, random.Shuffle)) return INVALID_MOVE;
         },
       },
     },

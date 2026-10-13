@@ -125,3 +125,30 @@ export function setupGame(ctx: Ctx, random?: RandomAPI): CycladesState {
     log: [{ cycle: 1, text: 'Партия началась. Боги ждут подношений.' }],
   };
 }
+
+/**
+ * Лобби: игрок выбирает себе цвет фишек. Свой цвет меняет каждый; хост ('0')
+ * может назначить цвет любому (нужно для хотсита, где все ходы идут от хоста).
+ * Занятый другим игроком цвет взять нельзя. Возвращает текст ошибки или null.
+ */
+export function applySetColor(G: CycladesState, actor: PlayerID, target: PlayerID, color: string): string | null {
+  if (G.started) return 'игра уже началась';
+  const p = G.players[target];
+  if (!p) return 'нет такого игрока';
+  if (actor !== target && actor !== '0') return 'можно менять только свой цвет';
+  if (!PLAYER_COLORS.includes(color)) return 'нет такого цвета';
+  if (Object.values(G.players).some((o) => o.id !== target && o.color === color)) return 'цвет уже занят';
+  p.color = color;
+  return null;
+}
+
+/** Лобби: хост раздаёт всем случайные (разные) цвета. */
+export function applyShuffleColors(
+  G: CycladesState, actor: PlayerID, shuffle: <T>(a: T[]) => T[],
+): string | null {
+  if (G.started) return 'игра уже началась';
+  if (actor !== '0') return 'цвета раздаёт хост';
+  const colors = shuffle([...PLAYER_COLORS]);
+  Object.keys(G.players).forEach((pid, i) => { G.players[pid].color = colors[i % colors.length]; });
+  return null;
+}
