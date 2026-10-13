@@ -824,7 +824,7 @@ function ProsperityPrompt({ G, me, moves, selected }: {
 
 function CreatureButtons({ G, pid, moves, sel, selected, god, s }: {
   G: CycladesState; pid: string; moves: any; sel: Territory | null;
-  selected: TerritoryId | null; god: GodName; s: { creatureBought?: boolean; creatureCycled?: boolean };
+  selected: TerritoryId | null; god: GodName; s: { creatureCycled?: boolean };
 }) {
   const market = G.creatures.market;
   if (market.length === 0 && god !== 'zeus') return null;
@@ -837,8 +837,7 @@ function CreatureButtons({ G, pid, moves, sel, selected, god, s }: {
         const cost = creaturePriceAt(G, pid, i); // цена по позиции слота
         const needsTarget = d.target !== 'none';
         const targetOk = creatureTargetOk(d, sel, pid);
-        const blocked = s.creatureBought ? 'существо уже куплено в этот ход'
-          : gold < cost ? 'не хватает золота' : creatureBlocked(G, pid, id);
+        const blocked = gold < cost ? 'не хватает золота' : creatureBlocked(G, pid, id);
         const disabled = !!blocked || (needsTarget && !targetOk);
         const title = blocked ?? (needsTarget && !targetOk ? `выберите цель: ${d.target}` : d.desc);
         return (

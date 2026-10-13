@@ -121,10 +121,15 @@ describe('покупка существ', () => {
     expect(G.players['0'].gold).toBe(5 + 4 - 4);
   });
 
-  it('одно существо за активацию', () => {
-    const G = withMarket(['fates', 'dryad', 'giant']);
-    expect(applyBuyCreature(G, '0', 0)).toBeNull();
-    expect(applyBuyCreature(G, '0', 1)).toBe('существо уже куплено в этот ход');
+  it('за активацию можно купить несколько существ, пока хватает золота', () => {
+    const G = withMarket(['griffon', 'sylph', 'giant']);
+    G.players['0'].gold = 7;
+    expect(applyBuyCreature(G, '0', 0)).toBeNull(); // 4
+    G.players['0'].gold = 3;
+    G.sylphMove = null;
+    expect(applyBuyCreature(G, '0', 1)).toBeNull(); // 3
+    expect(G.players['0'].gold).toBe(0);
+    expect(G.creatures.market).toEqual([null, null, 'giant']);
   });
 
 });

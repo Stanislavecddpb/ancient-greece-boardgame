@@ -191,10 +191,11 @@ export const CycladesGame: Game<CycladesState> = {
           if (applyCombatRetreat(G, playerID!)) return INVALID_MOVE;
         },
 
-        // Покупка мифического существа с рынка (одно за активацию любого бога).
+        // Покупка мифического существа с рынка (сколько угодно за активацию любого бога).
         buyCreature: ({ G, playerID }, slotIndex: number, targetId?: TId) => {
           const turn = currentTurn(G);
           if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID) return INVALID_MOVE;
+          if (creatureModePending(G)) return INVALID_MOVE; // сначала доиграть предыдущее существо
           if (applyBuyCreature(G, playerID!, slotIndex, targetId)) return INVALID_MOVE;
         },
 

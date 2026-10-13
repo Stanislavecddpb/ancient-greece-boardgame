@@ -156,8 +156,6 @@ export interface ActionsState {
   recruited: number;
   /** Уже построено здание в текущей активации? */
   built: boolean;
-  /** Куплено ли существо в текущей активации (одно за ход). */
-  creatureBought?: boolean;
   /** Прокручена ли колода существ Зевсом в текущей активации. */
   creatureCycled?: boolean;
 }

@@ -433,7 +433,8 @@ export function endKraken(G: CycladesState, pid: PlayerID): string | null {
 }
 
 /**
- * Покупка существа из рынка (slotIndex 0..2) с немедленным эффектом.
+ * Покупка существа из рынка (slotIndex 0..2) с немедленным эффектом. Лимита на
+ * число покупок за активацию нет — как в правилах, пока хватает золота.
  * Возвращает текст ошибки или null при успехе.
  */
 export function applyBuyCreature(
@@ -441,7 +442,6 @@ export function applyBuyCreature(
 ): string | null {
   const s = G.actions;
   if (!s) return 'нет фазы действий';
-  if (s.creatureBought) return 'существо уже куплено в этот ход';
   const id = G.creatures.market[slotIndex];
   if (!id) return 'нет существа в этом слоте';
   const def = CREATURES[id];
@@ -467,7 +467,6 @@ export function applyBuyCreature(
   }
 
   G.players[pid].gold -= cost;
-  s.creatureBought = true;
   if (def.placed) placeCreatureFigure(G, pid, def.id, targetId!);
   // Купленное уходит в сброс, слот остаётся пустым (рубашкой вверх) и НЕ
   // сдвигается. Существо в этот слот придёт при следующей прокрутке (конец
