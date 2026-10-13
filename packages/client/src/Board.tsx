@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { BoardProps } from 'boardgame.io/react';
 import {
@@ -6,6 +6,7 @@ import {
   type GodName,
   type TerritoryId,
   GOD_BUILDING,
+  BUILDING_COST,
   ALL_BUILDINGS,
   CREATURES,
   chimeraPlayable,
@@ -16,6 +17,10 @@ import {
   activePlayerId,
   godLabel,
   recruitCost,
+  recruitBlocked,
+  polyphemusMustPush,
+  polyphemusPushTargets,
+  creatureBlocked,
   freeSlots,
   metropolisSlotCost,
   canPlaceFleet,
@@ -41,6 +46,7 @@ function creatureTargetOk(def: CreatureDef, sel: Territory | null, pid: string):
     case 'own-island': return !!sel && isIsland(sel) && sel.ownerId === pid;
     case 'own-sea': return !!sel && isSea(sel);
     case 'enemy-island': return !!sel && isIsland(sel) && !!sel.ownerId && sel.ownerId !== pid && sel.troops > 0;
+    case 'enemy-building': return !!sel && isIsland(sel) && !!sel.ownerId && sel.ownerId !== pid && sel.buildings.length > 0;
     case 'enemy-sea': return !!sel && isSea(sel) && !!sel.ownerId && sel.ownerId !== pid && sel.fleets > 0;
     case 'any-island': return !!sel && isIsland(sel);
     case 'any-sea': return !!sel && isSea(sel);
@@ -107,15 +113,8 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
   let movement: MovementCtx | null = null;
   if (canAct && me && G.polyphemusPush && G.polyphemusPush.playerId === me && sel && isSea(sel) && sel.fleets > 0) {
     // Полифем: выбран соседний с островом флот — стрелки «от острова».
-    const island = G.territories[G.polyphemusPush.island];
-    const adj = isIsland(island) ? island.adjacentSeas : [];
-    if (adj.includes(sel.id)) {
-      const targets = sel.adjacentSeas.filter((id) => {
-        const t = G.territories[id];
-        return isSea(t) && !adj.includes(id) && !(t.fleets > 0 && t.ownerId !== (sel as any).ownerId);
-      });
-      if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.pushFleet(sel.id, to); setSelected(null); } };
-    }
+    const targets = polyphemusPushTargets(G, G.polyphemusPush.island, sel.id);
+    if (targets.length) movement = { from: sel.id, targets, onMove: (to) => { moves.pushFleet(sel.id, to); setSelected(null); } };
   } else if (canAct && me && G.sylphMove && G.sylphMove.playerId === me && sel && isSea(sel) && sel.ownerId === me && sel.fleets > 0) {
     // Сильфида: выбран свой флот — стрелки в соседние клетки (включая вражеские для атаки).
     const targets = sel.adjacentSeas.filter((id) => isSea(G.territories[id]));
@@ -234,6 +233,64 @@ function PlayersCorners({ G, ctx, activeId, me, nameOf }: {
   );
 }
 
+/** Что игрок ещё может сделать за этого бога — показываем перед завершением хода. */
+function pendingActions(G: CycladesState, pid: string, god: GodName): string[] {
+  const s = G.actions;
+  if (!s) return [];
+  const p = G.players[pid];
+  const mine = Object.values(G.territories).filter((t) => t.ownerId === pid);
+  const out: string[] = [];
+  if (s.recruited === 0 && !recruitBlocked(G, pid, god)) {
+    const what: Partial<Record<GodName, string>> = {
+      ares: 'не взято бесплатное войско', poseidon: 'не взят бесплатный флот',
+      zeus: 'не взят бесплатный жрец', athena: 'не взят бесплатный философ',
+    };
+    if (what[god]) out.push(what[god]!);
+  }
+  if (!s.built && GOD_BUILDING[god] && p.gold >= BUILDING_COST
+    && mine.some((t) => isIsland(t) && freeSlots(t) > 0)) out.push('можно построить здание');
+  if (god === 'ares' && p.gold >= 1 && mine.some((t) => isIsland(t) && t.troops > 0)) out.push('можно двигать войска');
+  if (god === 'poseidon' && p.gold >= 1 && mine.some((t) => isSea(t) && t.fleets > 0)) out.push('можно двигать флот');
+  return out;
+}
+
+/**
+ * «Завершить ход»: если ещё остались доступные действия, сначала спрашивает
+ * подтверждение в поповере над кнопкой (закрывается кликом мимо или по Esc).
+ */
+function EndTurnButton({ pending, onEnd }: { pending: string[]; onEnd: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [open]);
+  return (
+    <span className="end-turn-wrap" ref={ref}>
+      {open && (
+        <div className="confirm-pop" role="dialog" aria-label="Завершить ход?">
+          <div className="confirm-title">Завершить ход?</div>
+          <ul className="confirm-list">{pending.map((t) => <li key={t}>{t}</li>)}</ul>
+          <div className="confirm-actions">
+            <button className="end-turn" autoFocus onClick={() => { setOpen(false); onEnd(); }}>Да, завершить</button>
+            <button className="sub-done" onClick={() => setOpen(false)}>Отмена</button>
+          </div>
+        </div>
+      )}
+      <button className="end-turn" onClick={() => (pending.length > 0 ? setOpen((o) => !o) : onEnd())}>
+        Завершить ход →
+      </button>
+    </span>
+  );
+}
+
 function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove }: {
   G: CycladesState; me: string | null; moves: any; selected: TerritoryId | null;
   troopCount: number; setTroopCount: (n: number) => void; hasMove: boolean;
@@ -247,10 +304,14 @@ function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove 
   const sel = selected ? G.territories[selected] : null;
   const buildType = GOD_BUILDING[god];
 
-  const canRecruitTroop = !!sel && isIsland(sel) && sel.ownerId === pid;
-  const canRecruitFleet = !!sel && isSea(sel) && canPlaceFleet(G, pid, sel.id);
+  // Найм недоступен (лимит за ход / золото / запас фигурок) — кнопка гаснет с причиной.
+  const noRecruit = recruitBlocked(G, pid, god);
+  const recruitTail = noRecruit === 'лимит найма за ход' ? 'лимит' : `${recruitCost(god, s.recruited)}🪙`;
+  const canRecruitTroop = !noRecruit && !!sel && isIsland(sel) && sel.ownerId === pid;
+  const canRecruitFleet = !noRecruit && !!sel && isSea(sel) && canPlaceFleet(G, pid, sel.id);
   const canBuildHere =
-    !!sel && isIsland(sel) && sel.ownerId === pid && freeSlots(sel) > 0 && !!buildType;
+    !!sel && isIsland(sel) && sel.ownerId === pid && freeSlots(sel) > 0 && !!buildType
+    && G.players[pid].gold >= BUILDING_COST;
   // Источник перемещения войск выбран — показываем выбор количества; стрелки рисует карта.
   const troopSource = !!sel && isIsland(sel) && sel.ownerId === pid && sel.troops > 0 && god === 'ares';
   const fleetSource = !!sel && isSea(sel) && sel.ownerId === pid && sel.fleets > 0 && god === 'poseidon';
@@ -264,13 +325,13 @@ function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove 
         <div className="ab-controls">
           <span className="sel-hint">{sel ? sel.name : 'кликните по карте'}</span>
           {god === 'ares' && (
-            <button disabled={!canRecruitTroop} onClick={() => moves.recruit(selected)}>⚔️ войско ({recruitCost(god, s.recruited)}🪙)</button>
+            <button disabled={!canRecruitTroop} title={noRecruit ?? undefined} onClick={() => moves.recruit(selected)}>⚔️ войско ({recruitTail})</button>
           )}
           {god === 'poseidon' && (
-            <button disabled={!canRecruitFleet} onClick={() => moves.recruit(selected)}>⛵ флот ({recruitCost(god, s.recruited)}🪙)</button>
+            <button disabled={!canRecruitFleet} title={noRecruit ?? undefined} onClick={() => moves.recruit(selected)}>⛵ флот ({recruitTail})</button>
           )}
-          {god === 'zeus' && <button onClick={() => moves.recruit()}>⚜️ жрец ({recruitCost(god, s.recruited)}🪙)</button>}
-          {god === 'athena' && <button onClick={() => moves.recruit()}>📜 философ ({recruitCost(god, s.recruited)}🪙)</button>}
+          {god === 'zeus' && <button disabled={!!noRecruit} title={noRecruit ?? undefined} onClick={() => moves.recruit()}>⚜️ жрец ({recruitTail})</button>}
+          {god === 'athena' && <button disabled={!!noRecruit} title={noRecruit ?? undefined} onClick={() => moves.recruit()}>📜 философ ({recruitTail})</button>}
           {buildType && (
             <button disabled={!canBuildHere || s.built} onClick={() => moves.build(selected)}>🏗️ {buildType} (2🪙)</button>
           )}
@@ -289,7 +350,7 @@ function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove 
             </button>
           )}
           <CreatureButtons G={G} pid={pid} moves={moves} sel={sel} selected={selected} god={god} s={s} />
-          <button className="end-turn" onClick={() => moves.endGod()}>Завершить →</button>
+          <EndTurnButton pending={pendingActions(G, pid, god)} onEnd={() => moves.endGod()} />
         </div>
       )}
     </div>
@@ -509,7 +570,7 @@ function FleetMovePanel({ G, moves, take, setTake }: {
         <input type="number" min={1} max={carrying} value={eff}
           onChange={(e) => setTake(Math.max(1, Math.min(carrying, Number(e.target.value))))} style={{ width: 44 }} />
         <span className="sel-hint">→ кликните стрелку (оставшиеся {carrying - eff} высадятся здесь)</span>
-        <button className="end-turn" onClick={() => moves.endFleetMove()}>Завершить движение</button>
+        <button className="sub-done" onClick={() => moves.endFleetMove()}>Закончить движение флота</button>
       </div>
     </div>
   );
@@ -522,7 +583,7 @@ function SylphPanel({ G, moves }: { G: CycladesState; moves: any }) {
       <div className="ab-title">🌬️ Сильфида: движение флота · осталось клеток: {G.sylphMove!.stepsLeft}</div>
       <div className="ab-controls">
         <span className="sel-hint">выберите свой флот, кликайте стрелку (1 корабль = 1 клетка)</span>
-        <button className="end-turn" onClick={() => moves.endSylph()}>Готово</button>
+        <button className="sub-done" onClick={() => moves.endSylph()}>Готово</button>
       </div>
     </div>
   );
@@ -538,7 +599,7 @@ function KrakenPanel({ G, moves }: { G: CycladesState; moves: any }) {
         <span className="sel-hint">
           {budget > 0 ? 'кликайте стрелку (1🪙/клетка) — встреченный флот тонет' : 'нет золота на движение'}
         </span>
-        <button className="end-turn" onClick={() => moves.endKraken()}>Готово</button>
+        <button className="sub-done" onClick={() => moves.endKraken()}>Готово</button>
       </div>
     </div>
   );
@@ -546,13 +607,9 @@ function KrakenPanel({ G, moves }: { G: CycladesState; moves: any }) {
 
 /** Полифем: отталкивание соседнего флота от острова. */
 function PolyphemusPanel({ G, moves }: { G: CycladesState; moves: any }) {
-  // Завершить можно только когда рядом с островом Полифема не осталось флотов.
+  // Завершить можно, когда отодвинуты все флоты, которым есть куда отойти.
   const pp = G.polyphemusPush;
-  const island = pp ? G.territories[pp.island] : null;
-  const adjFleets = !!island && isIsland(island) && island.adjacentSeas.some((sid) => {
-    const s = G.territories[sid];
-    return isSea(s) && s.fleets > 0;
-  });
+  const adjFleets = !!pp && polyphemusMustPush(G, pp.island);
   return (
     <div className="action-bar fleetmove">
       <div className="ab-title">👁️ Полифем: отодвиньте соседний флот от острова</div>
@@ -560,7 +617,7 @@ function PolyphemusPanel({ G, moves }: { G: CycladesState; moves: any }) {
         <span className="sel-hint">
           {adjFleets ? 'отодвиньте все флоты от острова — затем «Готово»' : 'рядом флотов нет, можно завершать'}
         </span>
-        <button className="end-turn" disabled={adjFleets} onClick={() => moves.endPolyphemus()}>Готово</button>
+        <button className="sub-done" disabled={adjFleets} onClick={() => moves.endPolyphemus()}>Готово</button>
       </div>
     </div>
   );
@@ -597,7 +654,7 @@ function SphinxPanel({ G, me, moves }: { G: CycladesState; me: string | null; mo
         {num(pr, setPr, pl.priests, '⚜️ жрецы')}
         {num(ph, setPh, pl.philosophers, '📜 философы')}
         <span className="sel-hint">итого +{total * 2}🪙</span>
-        <button className="end-turn" onClick={() => moves.sellUnits(ef, et, epr, eph)}>Продать / Готово</button>
+        <button className="sub-done" onClick={() => moves.sellUnits(ef, et, epr, eph)}>Продать / Готово</button>
       </div>
     </div>
   );
@@ -624,7 +681,7 @@ function PegasusPanel({ G, me, moves, selected, troopCount, setTroopCount }: {
             <span className="sel-hint">→ стрелка на остров назначения (бой, если там враг)</span>
           </span>
         )}
-        <button className="end-turn" onClick={() => moves.endPegasus()}>Отмена</button>
+        <button className="sub-done" onClick={() => moves.endPegasus()}>Отмена</button>
       </div>
     </div>
   );
@@ -647,8 +704,9 @@ function ChimeraPanel({ G, me, moves, selected }: {
             const d = CREATURES[id];
             const needsTarget = d.target !== 'none';
             const targetOk = creatureTargetOk(d, sel, me!);
-            const disabled = needsTarget && !targetOk;
-            const title = needsTarget && !targetOk ? `выберите цель: ${d.target}` : d.desc;
+            const blocked = creatureBlocked(G, me!, id);
+            const disabled = !!blocked || (needsTarget && !targetOk);
+            const title = blocked ?? (needsTarget && !targetOk ? `выберите цель: ${d.target}` : d.desc);
             return (
               <button key={id} className="cr-buy" disabled={disabled} title={title}
                 onClick={() => moves.chimeraReplay(id, needsTarget ? selected : undefined)}>
@@ -657,7 +715,7 @@ function ChimeraPanel({ G, me, moves, selected }: {
             );
           })}
         </span>
-        <button className="end-turn" onClick={() => moves.endChimera()}>Пропустить</button>
+        <button className="sub-done" onClick={() => moves.endChimera()}>Пропустить</button>
       </div>
     </div>
   );
@@ -680,7 +738,7 @@ function SatyrPanel({ G, ctx, me, moves, nameOf }: {
           ))}
         </span>
         <span className="sel-hint">если философа нет — ничего не произойдёт</span>
-        <button className="end-turn" onClick={() => moves.endSatyr()}>Отмена</button>
+        <button className="sub-done" onClick={() => moves.endSatyr()}>Отмена</button>
       </div>
     </div>
   );
@@ -720,7 +778,7 @@ function CyclopsPanel({ G, moves }: { G: CycladesState; moves: any }) {
             </span>
           </>
         )}
-        <button className="end-turn" onClick={() => moves.endCyclops()}>Отмена</button>
+        <button className="sub-done" onClick={() => moves.endCyclops()}>Отмена</button>
       </div>
     </div>
   );
@@ -779,8 +837,10 @@ function CreatureButtons({ G, pid, moves, sel, selected, god, s }: {
         const cost = creaturePriceAt(G, pid, i); // цена по позиции слота
         const needsTarget = d.target !== 'none';
         const targetOk = creatureTargetOk(d, sel, pid);
-        const disabled = !!s.creatureBought || gold < cost || (needsTarget && !targetOk);
-        const title = needsTarget && !targetOk ? `выберите цель: ${d.target}` : d.desc;
+        const blocked = s.creatureBought ? 'существо уже куплено в этот ход'
+          : gold < cost ? 'не хватает золота' : creatureBlocked(G, pid, id);
+        const disabled = !!blocked || (needsTarget && !targetOk);
+        const title = blocked ?? (needsTarget && !targetOk ? `выберите цель: ${d.target}` : d.desc);
         return (
           <button key={i} className="cr-buy" disabled={disabled} title={title}
             onClick={() => moves.buyCreature(i, needsTarget ? selected : undefined)}>

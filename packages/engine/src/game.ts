@@ -38,6 +38,12 @@ function posOf(ctx: Ctx, pid: string | null | undefined): number {
   return i >= 0 ? i : ctx.playOrderPos;
 }
 
+/** Идёт ли незавершённый эффект существа (выбор цели, движение, распродажа...). */
+function creatureModePending(G: CycladesState): boolean {
+  return !!(G.sphinxResell || G.pegasusMove || G.chimeraPick || G.satyrSteal
+    || G.cyclopsSwap || G.sylphMove || G.krakenMove || G.polyphemusPush);
+}
+
 export const CycladesGame: Game<CycladesState> = {
   name: GAME_ID,
 
@@ -280,6 +286,7 @@ export const CycladesGame: Game<CycladesState> = {
         endGod: ({ G, ctx, playerID, events }) => {
           const turn = currentTurn(G);
           if (G.combat || G.fleetMove || G.metropolisPlace || !turn || turn.playerId !== playerID) return INVALID_MOVE;
+          if (creatureModePending(G)) return INVALID_MOVE; // сначала закончить/отменить эффект существа
           const done = advanceTurn(G);
           if (done) {
             endCycle(G, ctx);
@@ -295,6 +302,9 @@ export const CycladesGame: Game<CycladesState> = {
   // Победа: 2 Метрополии, проверяется на стыке циклов (когда фаза действий не идёт).
   endIf: ({ G, ctx }) => {
     if (G.actions !== null) return;
+    // Остался один невыбывший игрок — он победил.
+    const alive = ctx.playOrder.filter((pid) => !G.players[pid].isEliminated);
+    if (ctx.numPlayers > 1 && alive.length === 1) return { winner: alive[0] };
     const contenders = ctx.playOrder
       .filter((pid) => !G.players[pid].isEliminated)
       .map((pid) => ({ pid, metro: metropolisCount(G, pid), gold: G.players[pid].gold }))

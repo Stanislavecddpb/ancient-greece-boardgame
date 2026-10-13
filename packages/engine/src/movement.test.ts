@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { Ctx } from 'boardgame.io';
 import { setupGame } from './setup';
-import { startFleetMove, hopFleet, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, applyPushFleet } from './movement';
-import { placeBoardCreature } from './creatures';
+import { startFleetMove, hopFleet, troopReachable, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, applyPushFleet, endPolyphemus, polyphemusPushTargets } from './movement';
+import { placeBoardCreature, cleanupBoardCreatures } from './creatures';
+import { canPlaceFleet } from './actions';
 import { isSea, isIsland } from './board';
 import type { CycladesState, Sea } from './types';
 
@@ -179,6 +180,15 @@ describe('интерактивный бой', () => {
     expect(b.ownerId).toBe('1'); // защитник удержал клетку
   });
 
+  it('погибшие в бою корабли возвращаются в запас владельцев', () => {
+    const { G } = setupNavalFight();
+    G.players['0'].fleetsSupply = 3;
+    G.players['1'].fleetsSupply = 3;
+    applyCombatRound(G, '0', always(0)); // равенство — обе стороны теряют по кораблю
+    expect(G.players['0'].fleetsSupply).toBe(4);
+    expect(G.players['1'].fleetsSupply).toBe(4);
+  });
+
   it('чужой не может управлять боем', () => {
     const { G, b } = setupNavalFight();
     expect(applyCombatRound(G, '1', always(0))).toBe('не ваш бой');
@@ -246,6 +256,42 @@ describe('фигуры существ в движении', () => {
     expect(applyPushFleet(G, '0', adjId!, destId!)).toBeNull();
     expect(adj.fleets).toBe(0);
     expect((G.territories[destId!] as Sea).fleets).toBe(2);
+  });
+
+  it('Полифем: флот, которому некуда отойти, не блокирует завершение', () => {
+    const G = setupGame(ctxFor(4));
+    const isl = Object.values(G.territories).filter(isIsland)[0];
+    const adjId = isl.adjacentSeas.find((sid) => isSea(G.territories[sid]))!;
+    const adj = G.territories[adjId] as Sea;
+    for (const s of freshSeas(G)) { s.fleets = 0; s.ownerId = null; }
+    adj.ownerId = '1'; adj.fleets = 1;
+    // Все клетки «дальше от острова» заняты флотом другого цвета — отойти некуда.
+    for (const nb of adj.adjacentSeas) {
+      const t = G.territories[nb];
+      if (isSea(t) && !isl.adjacentSeas.includes(nb)) { t.ownerId = '2'; t.fleets = 1; }
+    }
+    placeBoardCreature(G, 'polyphemus', '0', isl.id);
+    G.polyphemusPush = { playerId: '0', island: isl.id };
+    expect(polyphemusPushTargets(G, isl.id, adjId)).toEqual([]);
+    expect(endPolyphemus(G, '0')).toBeNull();
+    expect(G.polyphemusPush).toBeNull();
+  });
+
+  it('флот нельзя нанять в зону рядом с Полифемом', () => {
+    const G = setupGame(ctxFor(4));
+    const sea = freshSeas(G).find((s) => canPlaceFleet(G, '0', s.id))!;
+    placeBoardCreature(G, 'polyphemus', '1', sea.adjacentIslands[0]);
+    expect(canPlaceFleet(G, '0', sea.id)).toBe(false);
+  });
+
+  it('фигура живёт до следующего хода владельца, но не дольше следующего цикла', () => {
+    const G = setupGame(ctxFor(4));
+    const isl = Object.values(G.territories).find(isIsland)!;
+    placeBoardCreature(G, 'minotaur', '0', isl.id);
+    G.cycle += 1; cleanupBoardCreatures(G); // конец цикла установки — фигура стоит
+    expect(G.boardCreatures).toHaveLength(1);
+    G.cycle += 1; cleanupBoardCreatures(G); // владелец так и не ходил — снимаем
+    expect(G.boardCreatures).toHaveLength(0);
   });
 
   it('Полифем не пускает флот в соседние зоны своего острова', () => {

@@ -148,7 +148,8 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 
 /* нижняя панель действий */
 .action-bar {
-  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 15;
+  /* выше раскрытого лога (16): в узком окне лог не должен закрывать кнопки действий */
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 17;
   background: #0c1828ee; border: 1px solid #2a3f5a; border-radius: 12px;
   padding: 8px 12px; max-width: 92%;
 }
@@ -158,7 +159,25 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
 .move-box { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; background: #11203a; border-radius: 8px; padding: 3px 6px; }
 .move-box button { background: #3a5a8a; padding: 2px 6px; font-size: 0.78rem; }
 .move-box input { border-radius: 5px; border: 1px solid #2a3f5a; background: #0f1b2a; color: #e8eef5; }
-.end-turn { background: #b3602f; }
+.end-turn { background: #b3602f; font-weight: 700; }
+/* Завершение под-действия (движение, существо) — спокойная, чтобы не путать с концом хода. */
+.sub-done { background: #3d4d63; }
+.sub-done:not(:disabled):hover { background: #4b5e78; }
+.end-turn-wrap { position: relative; display: inline-flex; }
+.action-bar:has(.confirm-pop) { z-index: 40; } /* поповер — поверх лога */
+.confirm-pop {
+  position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 30; width: max-content; max-width: 260px;
+  background: #101e31; border: 1px solid #b3602f; border-radius: 10px; padding: 10px 12px;
+  box-shadow: 0 8px 24px #000a; animation: confirm-in 0.12s ease-out;
+}
+.confirm-pop::after {
+  content: ''; position: absolute; top: 100%; right: 28px;
+  border: 7px solid transparent; border-top-color: #b3602f;
+}
+.confirm-title { font-weight: 700; margin-bottom: 4px; }
+.confirm-list { margin: 0 0 8px; padding-left: 1.1rem; font-size: 0.82rem; opacity: 0.9; }
+.confirm-actions { display: flex; gap: 6px; justify-content: flex-end; }
+@keyframes confirm-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .action-bar.prosperity { border-color: #caa24f; box-shadow: 0 0 0 1px #caa24f55, 0 0 18px #caa24f33; }
 .action-bar.prosperity button { background: #b8902f; }
 .action-bar.prosperity button:disabled { opacity: 0.45; }

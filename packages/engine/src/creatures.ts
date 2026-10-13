@@ -10,10 +10,12 @@ import { isIsland, isSea } from './board';
 import { islandsOf, log } from './helpers';
 import { incomeFor } from './income';
 import { checkMetropolis } from './metropolis';
+// Циклическая зависимость с movement.ts безопасна: функции вызываются только в рантайме.
+import { polyphemusMustPush } from './movement';
 
 /** Куда нужно нацелить существо при покупке (или none — без цели). */
 export type CreatureTarget =
-  | 'none' | 'own-island' | 'own-sea' | 'enemy-island' | 'enemy-sea'
+  | 'none' | 'own-island' | 'own-sea' | 'enemy-island' | 'enemy-building' | 'enemy-sea'
   | 'any-island' | 'any-sea';
 
 export interface CreatureDef {
@@ -89,7 +91,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     apply: (G, pid) => { G.players[pid].gold += incomeFor(G, pid); return null; },
   },
   giant: {
-    id: 'giant', name: 'Гигант', emblem: '🗿', cost: 3, target: 'enemy-island',
+    id: 'giant', name: 'Гигант', emblem: '🗿', cost: 3, target: 'enemy-building',
     desc: 'Разрушьте здание на вражеском острове (не Метрополию)',
     apply: (G, _pid, tid) => {
       const isl = G.territories[tid!];
@@ -261,6 +263,41 @@ export function advanceCreatureMarket(c: CreatureMarket): void {
   c.market.unshift(drawCard(c) ?? null);
 }
 
+/**
+ * Почему существо сейчас бесполезно для игрока (эффект заведомо не сработает),
+ * или null, если его есть смысл разыгрывать. Смотрит только на открытую
+ * информацию и собственные ресурсы игрока: Грифон и Сатир зависят от скрытых
+ * золота/философов соперников и потому не блокируются.
+ */
+export function creatureBlocked(G: CycladesState, pid: PlayerID, creatureId: string): string | null {
+  const all = Object.values(G.territories);
+  switch (creatureId) {
+    case 'chimera':
+      return G.creatures.discard.some(chimeraPlayable) ? null : 'в сбросе нет существ';
+    case 'cyclops':
+      return islandsOf(G, pid).some((i) => i.buildings.length > 0) ? null : 'у вас нет зданий';
+    case 'fates':
+      return incomeFor(G, pid) > 0 ? null : 'у вас нет дохода';
+    case 'pegasus': {
+      const canFly = islandsOf(G, pid).some(
+        (i) => i.troops > 0 && !G.boardCreatures.some((c) => c.kind === 'medusa' && c.location === i.id),
+      );
+      return canFly ? null : 'нет войск для переброски';
+    }
+    case 'sphinx': {
+      const p = G.players[pid];
+      const hasUnits = all.some(
+        (t) => t.ownerId === pid && ((isIsland(t) && t.troops > 0) || (isSea(t) && t.fleets > 0)),
+      );
+      return hasUnits || p.priests > 0 || p.philosophers > 0 ? null : 'нечего продавать';
+    }
+    case 'sylph':
+      return all.some((t) => isSea(t) && t.ownerId === pid && t.fleets > 0) ? null : 'у вас нет флота';
+    default:
+      return null;
+  }
+}
+
 /** Проверяет цель существа. Возвращает текст ошибки или null. */
 function validateTarget(G: CycladesState, pid: PlayerID, def: CreatureDef, tid?: string): string | null {
   const t = tid ? G.territories[tid] : undefined;
@@ -280,6 +317,8 @@ function validateTarget(G: CycladesState, pid: PlayerID, def: CreatureDef, tid?:
     }
     case 'enemy-island':
       return t && isIsland(t) && t.ownerId && t.ownerId !== pid && t.troops > 0 ? null : 'нужен вражеский остров с войсками';
+    case 'enemy-building':
+      return t && isIsland(t) && t.ownerId && t.ownerId !== pid && t.buildings.length > 0 ? null : 'нужен вражеский остров со зданием';
     case 'enemy-sea':
       return t && isSea(t) && t.ownerId && t.ownerId !== pid && t.fleets > 0 ? null : 'нужна вражеская зона с флотом';
     case 'any-island':
@@ -310,9 +349,14 @@ export function expireBoardCreatures(G: CycladesState, pid: PlayerID): void {
   G.boardCreatures = G.boardCreatures.filter((c) => !(c.ownerId === pid && c.placedCycle < G.cycle));
 }
 
-/** Подстраховка на стыке циклов: убрать фигуры старше текущего цикла. */
+/**
+ * Подстраховка на стыке циклов (вызывается после инкремента G.cycle): фигура,
+ * поставленная в только что закончившемся цикле, остаётся до следующего хода
+ * владельца (её снимет expireBoardCreatures). Более старые убираем — на случай,
+ * если владелец в свой следующий цикл не ходил (ушёл к Аполлону).
+ */
 export function cleanupBoardCreatures(G: CycladesState): void {
-  G.boardCreatures = G.boardCreatures.filter((c) => c.placedCycle >= G.cycle);
+  G.boardCreatures = G.boardCreatures.filter((c) => c.placedCycle >= G.cycle - 1);
 }
 
 /** Фигура существа данного вида на клетке (или null). */
@@ -329,12 +373,8 @@ function placeCreatureFigure(G: CycladesState, pid: PlayerID, kind: string, targ
   placeBoardCreature(G, kind, pid, targetId);
   // Полифем: даём поставившему отодвинуть соседний флот (если он есть).
   if (kind === 'polyphemus' && boardCreatureAt(G, targetId)?.kind === 'polyphemus') {
-    const isl = G.territories[targetId];
-    const hasAdjFleets = isIsland(isl) && isl.adjacentSeas.some((sid) => {
-      const s = G.territories[sid];
-      return isSea(s) && s.fleets > 0;
-    });
-    if (hasAdjFleets) G.polyphemusPush = { playerId: pid, island: targetId };
+    // Режим открываем, только если рядом есть флот, которому есть куда отойти.
+    if (polyphemusMustPush(G, targetId)) G.polyphemusPush = { playerId: pid, island: targetId };
   }
   // Кракен при установке топит весь флот в своей зоне (если фигура встала).
   if (kind === 'kraken' && boardCreatureAt(G, targetId)?.kind === 'kraken') {
@@ -409,6 +449,8 @@ export function applyBuyCreature(
 
   const cost = creaturePriceAt(G, pid, slotIndex); // цена по позиции слота
   if (G.players[pid].gold < cost) return 'не хватает золота';
+  const blocked = creatureBlocked(G, pid, id);
+  if (blocked) return blocked;
   const targetErr = validateTarget(G, pid, def, targetId);
   if (targetErr) return targetErr;
 
@@ -504,6 +546,8 @@ export function applyChimeraReplay(
   const def = CREATURES[creatureId];
   if (!def) return 'неизвестное существо';
   if (!chimeraPlayable(creatureId)) return 'Химерой нельзя разыграть это существо';
+  const blocked = creatureBlocked(G, pid, creatureId);
+  if (blocked) return blocked;
 
   const targetErr = validateTarget(G, pid, def, targetId);
   if (targetErr) return targetErr;

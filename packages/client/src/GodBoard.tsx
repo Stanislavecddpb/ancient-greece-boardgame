@@ -75,6 +75,15 @@ export function GodBoard({ G, ctx, me, moves, nameOf }: Props) {
   );
 }
 
+/**
+ * Бог, чья активация идёт сейчас. Пока первый выбравший Аполлона кладёт рог
+ * изобилия, активен Аполлон, а не первый бог очереди.
+ */
+function actingGod(G: CycladesState): GodName | null {
+  if (G.pendingCornucopia) return 'apollo';
+  return G.actions ? G.actions.queue[G.actions.index]?.god ?? null : null;
+}
+
 /** Кто «владеет» богом сейчас: ставка в аукционе или победитель в фазе действий. */
 function godOwnerId(G: CycladesState, phase: string | null, god: GodName): string | null {
   if (phase === 'auction') return G.auction?.slots.find((s) => s.god === god)?.occupantId ?? null;
@@ -88,8 +97,7 @@ function GodRow({ god, G, phase, me, moves, name }: {
 }) {
   const ownerId = godOwnerId(G, phase, god);
   const owner = ownerId ? G.players[ownerId] : null;
-  const activeTurn = G.actions ? G.actions.queue[G.actions.index] : null;
-  const isActiveGod = phase === 'actions' && activeTurn?.god === god;
+  const isActiveGod = phase === 'actions' && actingGod(G) === god;
   return (
     <div className="god-row">
       <div className={`god-owner-dot ${owner ? 'filled' : ''} ${isActiveGod ? 'acting' : ''}`}
@@ -157,8 +165,7 @@ function GodSlot({ god, G, phase, me, moves, name }: {
   const occupant = slot?.occupantId ? G.players[slot.occupantId] : null;
 
   // активный бог в фазе действий
-  const activeTurn = G.actions ? G.actions.queue[G.actions.index] : null;
-  const isActiveGod = phase === 'actions' && activeTurn?.god === god;
+  const isActiveGod = phase === 'actions' && actingGod(G) === god;
 
   return (
     <div className={`god-slot ${isActiveGod ? 'acting' : ''} ${imgOk ? 'has-img' : ''}`} style={{ ['--theme' as any]: d.theme }}>

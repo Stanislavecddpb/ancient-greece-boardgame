@@ -11,7 +11,7 @@ import {
   resolveAuction,
   paymentFor,
 } from './auction';
-import { applyRecruit, applyBuild, advanceTurn } from './actions';
+import { applyRecruit, applyBuild, advanceTurn, recruitBlocked } from './actions';
 import { checkMetropolis, applyPlaceMetropolis } from './metropolis';
 import { metropolisCount, islandsOf, freeSlots } from './helpers';
 import { islandAtCell } from './board';
@@ -81,10 +81,7 @@ describe('доход', () => {
 });
 
 describe('аукцион', () => {
-  it('godsForCycle: 2 — один бог, 4 — три (ротация), 5 — все четыре', () => {
-    // 2 игрока: один случайный бог; без shuffle — первый канонически, без ротации.
-    expect(godsForCycle(2, 1)).toEqual(['ares']);
-    expect(godsForCycle(2, 2)).toEqual(['ares']);
+  it('godsForCycle: 4 — три (ротация), 5 — все четыре', () => {
     expect(godsForCycle(4, 1)).toEqual(['ares', 'poseidon', 'zeus']);
     expect(godsForCycle(5, 1)).toEqual(['ares', 'poseidon', 'zeus', 'athena']);
   });
@@ -186,6 +183,30 @@ describe('действия', () => {
     expect(G.players['0'].troopsSupply).toBe(supply0 - 2);
     const home0 = G.territories['home_n'];
     if (home0.kind === 'island') expect(home0.troops).toBe(3); // было 1 + 2
+  });
+
+  it('Зевс: 1-й жрец бесплатно, 2-й за 4, 3-го нанять нельзя и золото не тратится', () => {
+    const ctx = ctxFor(4);
+    const G = setupGame(ctx);
+    actionsState(G, 'zeus');
+    G.players['0'].gold = 20;
+    expect(recruitBlocked(G, '0', 'zeus')).toBeNull();
+    expect(applyRecruit(G, '0', 'zeus')).toBeNull();
+    expect(applyRecruit(G, '0', 'zeus')).toBeNull();
+    expect(G.players['0'].gold).toBe(16);
+    expect(recruitBlocked(G, '0', 'zeus')).toBe('лимит найма за ход');
+    expect(applyRecruit(G, '0', 'zeus')).toBe('лимит найма за ход');
+    expect(G.players['0'].gold).toBe(16);
+    expect(G.players['0'].priests).toBe(2);
+  });
+
+  it('найм недоступен, если не хватает золота', () => {
+    const ctx = ctxFor(4);
+    const G = setupGame(ctx);
+    actionsState(G, 'athena');
+    G.players['0'].gold = 3;
+    expect(applyRecruit(G, '0', 'athena')).toBeNull(); // бесплатный
+    expect(recruitBlocked(G, '0', 'athena')).toBe('не хватает золота');
   });
 
   it('нельзя нанимать войска на чужой остров', () => {

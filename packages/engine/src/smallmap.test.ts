@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Ctx } from 'boardgame.io';
 import { createBoard, isIsland, isSea, islandAtCell, seaAtCell } from './board';
 import { setupGame } from './setup';
-import { godsForCycle } from './auction';
+import { godsForCycle, drawGods, setupAuction } from './auction';
 import { COMPETITIVE_GODS, PLAYER_COLORS, UNIT_SUPPLY, type GodName } from './types';
 
 function ctxFor(n: number): Ctx {
@@ -106,34 +106,48 @@ describe('стартовая расстановка на 3 игрока', () => 
   });
 });
 
-describe('боги на 3 игрока — случайные 2', () => {
-  it('без shuffle возвращает первые два бога канонически', () => {
-    expect(godsForCycle(3, 1)).toEqual(['ares', 'poseidon']);
+describe('боги на 3 игрока — по 2 из мешка', () => {
+  const reverse = <T,>(a: T[]) => [...a].reverse();
+
+  it('без shuffle — канонически: сначала Арес+Посейдон, затем Зевс+Афина', () => {
+    const bag: GodName[] = [];
+    expect(drawGods(bag, 2)).toEqual(['ares', 'poseidon']);
+    expect(drawGods(bag, 2)).toEqual(['zeus', 'athena']);
+    expect(bag).toEqual([]);
   });
 
-  it('всегда ровно 2 различных бога в каноническом порядке', () => {
-    const reverse = <T,>(a: T[]) => [...a].reverse();
-    const gods = godsForCycle(3, 5, reverse); // выбор = два последних: zeus, athena
-    expect(gods).toEqual(['zeus', 'athena']);
-    expect(new Set(gods).size).toBe(2);
+  it('порядок слотов случаен, а не канонический', () => {
+    const bag: GodName[] = [];
+    expect(drawGods(bag, 2, reverse)).toEqual(['athena', 'zeus']);
+    expect(drawGods(bag, 2, reverse)).toEqual(['poseidon', 'ares']);
   });
 
-  it('сохраняет канонический порядок при любом выборе', () => {
-    // shuffle, ставящий athena и ares первыми → канонический порядок ['ares','athena'].
-    const pick = (a: GodName[]) => {
-      const order: GodName[] = ['athena', 'ares', 'poseidon', 'zeus'];
-      return order.filter((g) => a.includes(g));
-    };
-    expect(godsForCycle(3, 1, pick as <T>(x: T[]) => T[])).toEqual(['ares', 'athena']);
+  it('за каждые два цикла выходят все 4 бога (Афина не пропадает)', () => {
+    const ctx = ctxFor(3);
+    const G = setupGame(ctx);
+    // «Случайность»: каждый раз другой сдвиг, чтобы круги отличались.
+    let n = 0;
+    const rotate = <T,>(a: T[]) => { n++; return [...a.slice(n % a.length), ...a.slice(0, n % a.length)]; };
+    for (let round = 0; round < 5; round++) {
+      const seen: GodName[] = [];
+      for (let i = 0; i < 2; i++) {
+        setupAuction(G, ctx, { Shuffle: rotate });
+        expect(G.auction!.slots).toHaveLength(2);
+        seen.push(...G.auction!.slots.map((s) => s.god));
+        G.cycle++;
+      }
+      expect([...seen].sort()).toEqual([...COMPETITIVE_GODS].sort());
+    }
   });
 
   it('у 4 игроков логика богов не изменилась (3 бога, ротация)', () => {
     expect(godsForCycle(4, 1)).toEqual(['ares', 'poseidon', 'zeus']);
     expect(godsForCycle(4, 2)).toEqual(['poseidon', 'zeus', 'athena']);
-  });
-
-  it('выбранные боги входят в набор конкурентных', () => {
-    for (const g of godsForCycle(3, 3)) expect(COMPETITIVE_GODS).toContain(g);
+    const ctx = ctxFor(4);
+    const G = setupGame(ctx);
+    setupAuction(G, ctx);
+    expect(G.auction!.slots.map((s) => s.god)).toEqual(['ares', 'poseidon', 'zeus']);
+    expect(G.godBag).toEqual([]);
   });
 });
 
@@ -152,12 +166,16 @@ describe('режим на 2 игрока (та же малая карта)', () 
     expect(fleets).toHaveLength(4);
   });
 
-  it('боги: ровно 1 случайный конкурентный бог за цикл', () => {
-    expect(godsForCycle(2, 1)).toEqual(['ares']); // без shuffle — первый
+  it('боги: по 1 за цикл из мешка — за 4 цикла выходят все четверо', () => {
+    const ctx = ctxFor(2);
+    const G = setupGame(ctx);
     const reverse = <T,>(a: T[]) => [...a].reverse();
-    const gods = godsForCycle(2, 1, reverse);
-    expect(gods).toHaveLength(1);
-    expect(gods).toEqual(['athena']); // последний после reverse
-    expect(COMPETITIVE_GODS).toContain(gods[0]);
+    const seen: GodName[] = [];
+    for (let i = 0; i < 4; i++) {
+      setupAuction(G, ctx, { Shuffle: reverse });
+      expect(G.auction!.slots).toHaveLength(1);
+      seen.push(G.auction!.slots[0].god);
+    }
+    expect(seen).toEqual(['athena', 'zeus', 'poseidon', 'ares']);
   });
 });

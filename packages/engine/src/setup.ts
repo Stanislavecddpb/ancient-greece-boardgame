@@ -104,6 +104,7 @@ export function setupGame(ctx: Ctx, random?: RandomAPI): CycladesState {
     territories,
     cycle: 1,
     startIndex: 0,
+    godBag: [],
     started: false,
     auction: null,
     actions: null,

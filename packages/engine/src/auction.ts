@@ -8,37 +8,45 @@ import {
 } from './types';
 import { log, islandsOf } from './helpers';
 
+/** Сколько конкурентных богов за цикл открывается на малой карте (из «мешка»). */
+const BAG_GODS_PER_CYCLE: Record<number, number> = { 2: 1, 3: 2 };
+
 /**
- * Боги, выставляемые на аукцион в этом цикле (Аполлон всегда доступен отдельно).
+ * Достаёт `count` богов из «мешка» (малая карта, 2–3 игрока). Когда мешок пуст,
+ * в него заново тасуются все 4 конкурентных бога — так каждый бог гарантированно
+ * выходит раз в круг (за 2 цикла на троих, за 4 на двоих), и Афина не может
+ * пропадать много циклов подряд. Порядок выдачи случаен и задаёт порядок слотов,
+ * то есть порядок активации в фазе действий. Без shuffle (тесты) — канонический.
+ */
+export function drawGods(
+  bag: GodName[],
+  count: number,
+  shuffle?: <T>(a: T[]) => T[],
+): GodName[] {
+  const drawn: GodName[] = [];
+  while (drawn.length < count) {
+    if (bag.length === 0) {
+      bag.push(...(shuffle ? shuffle([...COMPETITIVE_GODS]) : COMPETITIVE_GODS));
+    }
+    drawn.push(bag.shift()!);
+  }
+  return drawn;
+}
+
+/**
+ * Боги, выставляемые на аукцион в этом цикле на стандартных картах (Аполлон
+ * всегда доступен отдельно). Для 2–3 игроков боги берутся из мешка — см. drawGods.
  *
- *  • 2 игрока (малая карта): каждый цикл открывается ровно 1 случайный
- *    конкурентный бог (Аполлон, как всегда, доступен отдельно).
- *  • 3 игрока (малая карта): каждый цикл случайно открываются ровно 2 из 4
- *    конкурентных богов. Случаен только выбор — порядок исполнения остаётся
- *    каноническим (Арес → Посейдон → Зевс → Афина).
  *  • 5 игроков: открываются все 4 конкурентных бога, но в случайном порядке
  *    каждый цикл — порядок слотов задаёт порядок активации в фазе действий.
- *  • иначе (стандартная карта): numPlayers − 1 конкурентных богов с ротацией по
- *    циклам (при 4 игроках — все четыре, в каноническом порядке).
+ *  • иначе: numPlayers − 1 конкурентных богов с ротацией по циклам, в
+ *    каноническом порядке (Арес → Посейдон → Зевс → Афина).
  */
 export function godsForCycle(
   numPlayers: number,
   cycle: number,
   shuffle?: <T>(a: T[]) => T[],
 ): GodName[] {
-  if (numPlayers === 2) {
-    // Один случайный бог; без shuffle (тесты) — первый канонически (Арес).
-    const order = shuffle ? shuffle([...COMPETITIVE_GODS]) : [...COMPETITIVE_GODS];
-    return [order[0]];
-  }
-
-  if (numPlayers === 3) {
-    // Случайные 2 бога; без shuffle (например, в тестах) — первые два канонически.
-    const order = shuffle ? shuffle([...COMPETITIVE_GODS]) : [...COMPETITIVE_GODS];
-    const chosen = new Set<GodName>(order.slice(0, 2));
-    return COMPETITIVE_GODS.filter((g) => chosen.has(g));
-  }
-
   if (numPlayers === 5) {
     // Все 4 бога, порядок случаен (порядок слотов = порядок активации).
     // Без shuffle (тесты) — канонический порядок.
@@ -84,7 +92,10 @@ interface RandomAPI { Shuffle?: <T>(a: T[]) => T[] }
 
 /** Готовит состояние аукциона в начале фазы. */
 export function setupAuction(G: CycladesState, ctx: Ctx, random?: RandomAPI): void {
-  const gods = godsForCycle(ctx.numPlayers, G.cycle, random?.Shuffle);
+  const fromBag = BAG_GODS_PER_CYCLE[ctx.numPlayers];
+  const gods = fromBag
+    ? drawGods((G.godBag ??= []), fromBag, random?.Shuffle) // ??= — партии, начатые до мешка
+    : godsForCycle(ctx.numPlayers, G.cycle, random?.Shuffle);
   const slots: GodSlot[] = gods.map((god) => ({ god, occupantId: null, bid: 0 }));
   const starter = ctx.playOrder[G.startIndex % ctx.playOrder.length];
   G.auction = { slots, apollo: [], toAct: starter, lastDisplaced: null };

@@ -15,6 +15,7 @@ import {
   endChimera,
   applySatyrSteal,
   applyCyclopsReplace,
+  creatureBlocked,
 } from './creatures';
 import { applyPegasusMove } from './movement';
 import type { CycladesState, Sea } from './types';
@@ -282,7 +283,7 @@ describe('Циклоп', () => {
     G.players['0'].gold = 9;
     const isl = G.territories['home_n'];
     if (isl.kind === 'island') { isl.ownerId = '0'; isl.buildings = []; }
-    expect(applyBuyCreature(G, '0', 0, 'home_n')).toBe('нужно своё здание');
+    expect(applyBuyCreature(G, '0', 0, 'home_n')).toBe('у вас нет зданий');
     expect(G.cyclopsSwap).toBeNull();
   });
 });
@@ -366,5 +367,54 @@ describe('Химера', () => {
     expect(G.chimeraPick).toBeNull();
     expect(G.creatures.discard).toHaveLength(0);
     expect(G.creatures.deck).toContain('dryad');
+  });
+});
+
+describe('бесполезные существа не покупаются (золото не тратится)', () => {
+  /** Убирает у игрока '0' весь флот с доски. */
+  function sinkFleets(G: CycladesState) {
+    for (const t of Object.values(G.territories)) {
+      if (t.kind === 'sea' && t.ownerId === '0') { t.fleets = 0; t.ownerId = null; }
+    }
+  }
+
+  it('Химера при пустом сбросе', () => {
+    const G = withMarket(['chimera', 'a', 'b']);
+    G.players['0'].gold = 9;
+    expect(applyBuyCreature(G, '0', 0)).toBe('в сбросе нет существ');
+    expect(G.players['0'].gold).toBe(9);
+    expect(G.chimeraPick).toBeFalsy();
+    G.creatures.discard = ['fates'];
+    expect(applyBuyCreature(G, '0', 0)).toBeNull();
+  });
+
+  it('Сильфида без флота', () => {
+    const G = withMarket(['sylph', 'a', 'b']);
+    G.players['0'].gold = 9;
+    expect(creatureBlocked(G, '0', 'sylph')).toBeNull();
+    sinkFleets(G);
+    expect(applyBuyCreature(G, '0', 0)).toBe('у вас нет флота');
+    expect(G.players['0'].gold).toBe(9);
+  });
+
+  it('Пегас без войск; Сфинкс, когда нечего продавать', () => {
+    const G = withMarket(['pegasus', 'sphinx', 'b']);
+    G.players['0'].gold = 9;
+    expect(creatureBlocked(G, '0', 'pegasus')).toBeNull();
+    expect(creatureBlocked(G, '0', 'sphinx')).toBeNull();
+    sinkFleets(G);
+    for (const t of Object.values(G.territories)) if (t.kind === 'island' && t.ownerId === '0') t.troops = 0;
+    expect(applyBuyCreature(G, '0', 0)).toBe('нет войск для переброски');
+    expect(applyBuyCreature(G, '0', 1)).toBe('нечего продавать');
+    expect(G.players['0'].gold).toBe(9);
+  });
+
+  it('Химера не разыгрывает бесполезное существо из сброса', () => {
+    const G = withMarket(['a', 'b', 'c']);
+    G.creatures.discard = ['sylph'];
+    G.chimeraPick = '0';
+    sinkFleets(G);
+    expect(applyChimeraReplay(G, '0', 'sylph')).toBe('у вас нет флота');
+    expect(G.chimeraPick).toBe('0');
   });
 });

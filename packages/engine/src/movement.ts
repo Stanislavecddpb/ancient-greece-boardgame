@@ -1,4 +1,4 @@
-import type { CycladesState, PlayerID, TerritoryId, Island } from './types';
+import { type CycladesState, type PlayerID, type TerritoryId, type Island, UNIT_SUPPLY } from './types';
 import { isSea, isIsland } from './board';
 import { oneRound, type DieRoll } from './combat';
 import { log } from './helpers';
@@ -76,7 +76,7 @@ export function startFleetMove(G: CycladesState, pid: PlayerID, seaId: Territory
 }
 
 /** Закрыта ли морская зона для флота: Кракен в ней или Полифем на соседнем острове. */
-function seaBlockedForFleet(G: CycladesState, seaId: TerritoryId): boolean {
+export function seaBlockedForFleet(G: CycladesState, seaId: TerritoryId): boolean {
   if (G.boardCreatures.some((c) => c.kind === 'kraken' && c.location === seaId)) return true;
   const sea = G.territories[seaId];
   if (sea && isSea(sea)) {
@@ -198,6 +198,32 @@ export function endSylph(G: CycladesState, pid: PlayerID): string | null {
   return null;
 }
 
+/** Куда Полифем может отодвинуть флот из зоны fromSeaId (соседней с его островом). */
+export function polyphemusPushTargets(G: CycladesState, islandId: TerritoryId, fromSeaId: TerritoryId): TerritoryId[] {
+  const island = G.territories[islandId];
+  const from = G.territories[fromSeaId];
+  if (!island || !isIsland(island) || !from || !isSea(from) || from.fleets <= 0) return [];
+  if (!island.adjacentSeas.includes(fromSeaId)) return [];
+  return from.adjacentSeas.filter((toId) => {
+    const to = G.territories[toId];
+    if (!to || !isSea(to)) return false;
+    if (island.adjacentSeas.includes(toId)) return false; // нужно дальше от острова
+    if (seaBlockedForFleet(G, toId)) return false;
+    return !(to.fleets > 0 && to.ownerId !== from.ownerId); // цвета не смешиваются
+  });
+}
+
+/**
+ * Остались ли у острова Полифема флоты, которые ещё можно отодвинуть. Флот,
+ * которому некуда отойти, остаётся на месте и завершению не мешает (иначе
+ * партия зависала бы в режиме отталкивания).
+ */
+export function polyphemusMustPush(G: CycladesState, islandId: TerritoryId): boolean {
+  const island = G.territories[islandId];
+  return !!island && isIsland(island)
+    && island.adjacentSeas.some((sid) => polyphemusPushTargets(G, islandId, sid).length > 0);
+}
+
 /**
  * Полифем: поставивший игрок отодвигает соседний с островом флот (даже чужой)
  * на одну клетку дальше от острова. Двигается весь стек; цвета не смешиваются.
@@ -223,25 +249,16 @@ export function applyPushFleet(G: CycladesState, pid: PlayerID, fromSeaId: Terri
   from.ownerId = null;
   log(G, `Полифем отталкивает флот → ${to.name}.`);
 
-  // Если рядом с островом больше нет флота — отталкивание завершено.
-  const more = island.adjacentSeas.some((sid) => {
-    const s = G.territories[sid];
-    return isSea(s) && s.fleets > 0;
-  });
-  if (!more) G.polyphemusPush = null;
+  // Больше отодвигать нечего (или оставшимся некуда отойти) — отталкивание завершено.
+  if (!polyphemusMustPush(G, pp.island)) G.polyphemusPush = null;
   return null;
 }
 
-/** Завершить отталкивание Полифемом — только когда рядом с островом не осталось флота. */
+/** Завершить отталкивание Полифемом — только когда отодвинуты все флоты, которым есть куда отойти. */
 export function endPolyphemus(G: CycladesState, pid: PlayerID): string | null {
   const pp = G.polyphemusPush;
   if (!pp || pp.playerId !== pid) return 'нет отталкивания';
-  const island = G.territories[pp.island];
-  const stillAdjacent = isIsland(island) && island.adjacentSeas.some((sid) => {
-    const s = G.territories[sid];
-    return isSea(s) && s.fleets > 0;
-  });
-  if (stillAdjacent) return 'сначала отодвиньте все флоты от острова';
+  if (polyphemusMustPush(G, pp.island)) return 'сначала отодвиньте все флоты от острова';
   G.polyphemusPush = null;
   return null;
 }
@@ -427,7 +444,14 @@ export function applyCombatRound(G: CycladesState, pid: PlayerID, roll: DieRoll)
   const c = G.combat;
   if (!c) return 'нет боя';
   if (c.attackerId !== pid) return 'не ваш бой';
+  const before = { attacker: c.attackerUnits, defender: c.defenderUnits };
   oneRound(c, roll);
+  // Погибшие не пропадают навсегда: фигурки возвращаются владельцам в запас.
+  const supply = c.kind === 'naval' ? 'fleetsSupply' : 'troopsSupply';
+  const attacker = G.players[c.attackerId];
+  const defender = G.players[c.defenderId];
+  attacker[supply] = Math.min(UNIT_SUPPLY, attacker[supply] + before.attacker - c.attackerUnits);
+  defender[supply] = Math.min(UNIT_SUPPLY, defender[supply] + before.defender - c.defenderUnits);
   // Синхронизируем видимые юниты защитника на клетке.
   const loc = G.territories[c.location];
   if (c.kind === 'naval' && isSea(loc)) loc.fleets = c.defenderUnits;

@@ -12,6 +12,7 @@ import { isIsland, isSea } from './board';
 import { islandsOf, freeSlots, log } from './helpers';
 import { checkMetropolis } from './metropolis';
 import { advanceCreatureMarket, cleanupBoardCreatures } from './creatures';
+import { seaBlockedForFleet } from './movement';
 
 /** Что и почём нанимает каждый бог за одну активацию. */
 type RecruitKind = 'troop' | 'fleet' | 'priest' | 'philosopher';
@@ -69,6 +70,7 @@ export function canPlaceFleet(G: CycladesState, pid: string, seaId: TerritoryId)
   const sea = G.territories[seaId];
   if (!sea || !isSea(sea)) return false;
   if (sea.fleets > 0 && sea.ownerId !== pid) return false; // занято врагом
+  if (seaBlockedForFleet(G, seaId)) return false; // Кракен в зоне / Полифем рядом
   const touchesOwnIsland = sea.adjacentIslands.some((iid) => {
     const isl = G.territories[iid];
     return isl && isIsland(isl) && isl.ownerId === pid;
@@ -78,23 +80,37 @@ export function canPlaceFleet(G: CycladesState, pid: string, seaId: TerritoryId)
 
 // --- Эффекты действий (мутируют G; валидация — в обёртках-ходах) ---
 
+/**
+ * Почему игрок сейчас не может нанять у бога (лимит за ход, золото, запас фигурок),
+ * или null, если найм доступен. Цель (остров/море) здесь не проверяется.
+ */
+export function recruitBlocked(G: CycladesState, pid: string, god: GodName): string | null {
+  const cfg = RECRUIT_CONFIG[god];
+  const s = G.actions;
+  if (!cfg || !s) return 'нет действия';
+  if (s.recruited >= cfg.max) return 'лимит найма за ход';
+  const player = G.players[pid];
+  if (player.gold < recruitCost(god, s.recruited)) return 'не хватает золота';
+  if (cfg.kind === 'troop' && player.troopsSupply <= 0) return 'нет фигурок войск';
+  if (cfg.kind === 'fleet' && player.fleetsSupply <= 0) return 'нет фигурок флота';
+  return null;
+}
+
 export function applyRecruit(
   G: CycladesState,
   pid: string,
   god: GodName,
   targetId?: TerritoryId,
 ): string | null {
-  const cfg = RECRUIT_CONFIG[god];
-  const s = G.actions;
-  if (!cfg || !s) return 'нет действия';
-  if (s.recruited >= cfg.max) return 'лимит найма за ход';
+  const blocked = recruitBlocked(G, pid, god);
+  if (blocked) return blocked;
+  const cfg = RECRUIT_CONFIG[god]!;
+  const s = G.actions!;
   const cost = recruitCost(god, s.recruited);
   const player = G.players[pid];
-  if (player.gold < cost) return 'не хватает золота';
 
   switch (cfg.kind) {
     case 'troop': {
-      if (player.troopsSupply <= 0) return 'нет фигурок войск';
       const island = targetId ? G.territories[targetId] : undefined;
       if (!island || !isIsland(island) || island.ownerId !== pid) return 'нужен свой остров';
       island.troops += 1;
@@ -102,7 +118,6 @@ export function applyRecruit(
       break;
     }
     case 'fleet': {
-      if (player.fleetsSupply <= 0) return 'нет фигурок флота';
       if (!targetId || !canPlaceFleet(G, pid, targetId)) return 'нельзя разместить флот здесь';
       const sea = G.territories[targetId];
       if (!isSea(sea)) return 'нужна морская зона';
