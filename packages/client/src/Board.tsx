@@ -333,7 +333,7 @@ function ActionBar({ G, me, moves, selected, troopCount, setTroopCount, hasMove 
           {god === 'zeus' && <button disabled={!!noRecruit} title={noRecruit ?? undefined} onClick={() => moves.recruit()}>⚜️ жрец ({recruitTail})</button>}
           {god === 'athena' && <button disabled={!!noRecruit} title={noRecruit ?? undefined} onClick={() => moves.recruit()}>📜 философ ({recruitTail})</button>}
           {buildType && (
-            <button disabled={!canBuildHere || s.built} onClick={() => moves.build(selected)}>🏗️ {buildType} (2🪙)</button>
+            <button disabled={!canBuildHere} onClick={() => moves.build(selected)}>🏗️ {buildType} (2🪙)</button>
           )}
           {troopSource && (
             <span className="move-box">

@@ -144,7 +144,6 @@ export function applyRecruit(
 export function applyBuild(G: CycladesState, pid: string, god: GodName, islandId: TerritoryId): string | null {
   const s = G.actions;
   if (!s) return 'нет действия';
-  if (s.built) return 'здание уже построено в этот ход';
   const type = GOD_BUILDING[god];
   if (!type) return 'этот бог не строит';
   const player = G.players[pid];

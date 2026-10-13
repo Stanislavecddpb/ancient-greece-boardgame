@@ -216,7 +216,7 @@ describe('действия', () => {
     expect(applyRecruit(G, '0', 'ares', 'home_s')).not.toBeNull();
   });
 
-  it('постройка здания стоит 2 и занимает слот; один раз за активацию', () => {
+  it('постройка здания стоит 2 и занимает слот; лимита за активацию нет', () => {
     const ctx = ctxFor(4);
     const G = setupGame(ctx);
     actionsState(G, 'ares');
@@ -225,7 +225,14 @@ describe('действия', () => {
     expect(G.players['0'].gold).toBe(gold0 - 2);
     const home0 = G.territories['home_n'];
     if (home0.kind === 'island') expect(home0.buildings.map((b) => b.type)).toContain('fortress');
-    expect(applyBuild(G, '0', 'ares', 'home_n')).not.toBeNull(); // второй раз нельзя
+    // Второе здание за тот же ход — можно, пока есть золото и свободный слот.
+    if (home0.kind === 'island' && freeSlots(home0) > 0) {
+      expect(applyBuild(G, '0', 'ares', 'home_n')).toBeNull();
+      expect(G.players['0'].gold).toBe(gold0 - 4);
+      expect(home0.buildings).toHaveLength(2);
+    }
+    G.players['0'].gold = 1;
+    expect(applyBuild(G, '0', 'ares', 'home_n')).not.toBeNull(); // не хватает золота
   });
 });
 
