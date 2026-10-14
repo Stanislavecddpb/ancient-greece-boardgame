@@ -115,4 +115,35 @@ describe('интеграция фаз через boardgame.io', () => {
     s = client.getState()!;
     expect(s.G.cycle).toBe(2);
   });
+
+  it('4 игрока: за один ход можно построить несколько зданий', () => {
+    const client = makeClient(4);
+    startGame(client);
+    const plan: Record<string, () => void> = {
+      '0': () => client.moves.bidGod('zeus', 1),
+      '1': () => client.moves.bidGod('ares', 1),
+      '2': () => client.moves.chooseApollo(),
+      '3': () => client.moves.bidGod('poseidon', 1),
+    };
+    let guard = 0;
+    while (client.getState()!.ctx.phase === 'auction' && guard++ < 10) plan[client.getState()!.ctx.currentPlayer]();
+    let s = client.getState()!;
+    client.moves.placeCornucopia(islandOf(s.G, '2'));
+    s = client.getState()!;
+    expect(s.ctx.currentPlayer).toBe('1'); // Арес
+
+    // Свободные слоты Ареса по всем его островам — строим, пока хватает золота и места.
+    const slots = Object.values(s.G.territories).filter((t) => t.kind === 'island' && t.ownerId === '1')
+      .flatMap((t) => Array.from({ length: t.kind === 'island' ? t.buildSlots - t.buildings.length : 0 }, () => t.id));
+    const gold0 = s.G.players['1'].gold;
+    const canBuild = Math.min(slots.length, Math.floor(gold0 / 2));
+    expect(canBuild).toBeGreaterThanOrEqual(2); // иначе тест ничего не проверяет
+    for (const id of slots.slice(0, canBuild)) client.moves.build(id);
+    s = client.getState()!;
+    const fortresses = Object.values(s.G.territories)
+      .filter((t) => t.kind === 'island' && t.ownerId === '1')
+      .reduce((n, t) => n + (t.kind === 'island' ? t.buildings.filter((b) => b.type === 'fortress').length : 0), 0);
+    expect(fortresses).toBe(canBuild);
+    expect(s.G.players['1'].gold).toBe(gold0 - 2 * canBuild);
+  });
 });
