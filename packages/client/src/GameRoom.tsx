@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { GreekPage } from './GreekPage';
-import { lobby, GAME_ID, NetClient, loadSeat, saveSeat, savedName, rememberName, type Seat } from './net';
+import { lobby, GAME_ID, NetClient, loadSeat, saveSeat, forgetSeat, savedName, rememberName, type Seat } from './net';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
 
@@ -20,6 +20,12 @@ export function GameRoom({ matchID }: { matchID: string }) {
     try {
       const m = await lobby.getMatch(GAME_ID, matchID);
       setPlayers(m.players as MatchPlayer[]);
+      // Место освободили снаружи (платформа) — сохранённый вход больше не действует.
+      const mine = loadSeat(matchID);
+      if (mine && (m.players as MatchPlayer[])[Number(mine.playerID)]?.name !== mine.name) {
+        forgetSeat(matchID);
+        setSeat(null);
+      }
       setError(null);
     } catch {
       setError('Партия не найдена. Проверьте код.');
