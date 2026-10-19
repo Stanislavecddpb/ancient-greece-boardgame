@@ -406,3 +406,10 @@ button:disabled { background: #34465c; color: #7e93ab; cursor: not-allowed; }
   .gs-colors { width: 100%; justify-content: flex-end; }
 }
 @media (prefers-reduced-motion: reduce) { .greek-btn, .gs-swatch { transition: none; } }
+
+/* Встроено в платформу Zarya Boardgames */
+.embed .back,
+.embed .page-link,
+.embed .greek-link {
+  display: none;
+}
