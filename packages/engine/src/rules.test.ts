@@ -12,7 +12,7 @@ import {
   resolveAuction,
   paymentFor,
 } from './auction';
-import { applyRecruit, applyBuild, advanceTurn, recruitBlocked } from './actions';
+import { applyRecruit, applyBuild, advanceTurn, recruitBlocked, endCycle } from './actions';
 import { checkMetropolis, applyPlaceMetropolis } from './metropolis';
 import { metropolisCount, islandsOf, freeSlots } from './helpers';
 import { islandAtCell } from './board';
@@ -300,21 +300,38 @@ describe('Метрополия', () => {
 });
 
 describe('победа', () => {
-  it('endIf объявляет победителя при 2 Метрополиях между циклами', () => {
-    const ctx = ctxFor(4);
-    const G = setupGame(ctx);
-    // Две Метрополии на островах игрока '0'.
+  /** Две Метрополии у игрока '0'. */
+  function twoMetros(G: CycladesState) {
     for (const id of ['home_n', 'naxos']) {
       const isl = G.territories[id];
-      if (isl.kind === 'island') {
-        isl.ownerId = '0';
-        isl.hasMetropolis = true;
-      }
+      if (isl.kind === 'island') { isl.ownerId = '0'; isl.hasMetropolis = true; }
     }
-    expect(islandsOf(G, '0').filter((i) => i.hasMetropolis)).toHaveLength(2);
-    G.actions = null; // стык циклов
-    const result = (CycladesGame.endIf as any)({ G, ctx });
-    expect(result).toEqual({ winner: '0' });
+  }
+
+  it('две Метрополии должны устоять ещё один цикл', () => {
+    const ctx = ctxFor(4);
+    const G = setupGame(ctx);
+    twoMetros(G);
+    endCycle(G, ctx); // цикл, в котором построены, — ещё не победа
+    expect(G.winner).toBeNull();
+    expect(G.metroHolders).toEqual(['0']);
+    G.actions = null;
+    expect((CycladesGame.endIf as any)({ G, ctx })).toBeUndefined();
+    endCycle(G, ctx); // устояли целый цикл — победа
+    expect(G.winner).toBe('0');
+    expect((CycladesGame.endIf as any)({ G, ctx })).toEqual({ winner: '0' });
+  });
+
+  it('если Метрополию отобрали за этот цикл — победы нет, отсчёт сначала', () => {
+    const ctx = ctxFor(4);
+    const G = setupGame(ctx);
+    twoMetros(G);
+    endCycle(G, ctx);
+    const naxos = G.territories['naxos'];
+    if (naxos.kind === 'island') naxos.ownerId = '1'; // захват острова с Метрополией
+    endCycle(G, ctx);
+    expect(G.winner).toBeNull();
+    expect(G.metroHolders).toEqual([]);
   });
 
   it('во время фазы действий победа не засчитывается', () => {

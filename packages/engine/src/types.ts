@@ -175,7 +175,32 @@ export interface CombatState {
   defenderBonus: number;
   round: number;
   /** Результат последнего раунда для интерфейса (aDie/dDie — выпавшие грани кости). */
-  lastRoll: { attacker: number; defender: number; aDie: number; dDie: number; aLost: boolean; dLost: boolean } | null;
+  lastRoll: CombatRound | null;
+  /** Все раунды боя по порядку (для модалки боя). */
+  history?: CombatRound[];
+  /** Силы сторон в начале боя (до первого раунда). */
+  startAttacker?: number;
+  startDefender?: number;
+}
+
+/** Итог одного раунда: силы ПОСЛЕ раунда, выпавшие грани и кто потерял юнита. */
+export interface CombatRound { attacker: number; defender: number; aDie: number; dDie: number; aLost: boolean; dLost: boolean }
+
+/** Итог завершённого боя — его показывают всем в модалке результата. */
+export interface CombatReport {
+  /** Растёт с каждым боем: клиент по нему понимает, что результат новый. */
+  id: number;
+  kind: 'land' | 'naval';
+  location: TerritoryId;
+  attackerId: PlayerID;
+  defenderId: PlayerID;
+  result: 'attacker' | 'defender' | 'retreat' | 'cancelled';
+  startAttacker: number;
+  startDefender: number;
+  attackerLeft: number;
+  defenderLeft: number;
+  defenderBonus: number;
+  history: CombatRound[];
 }
 
 /**
@@ -307,6 +332,15 @@ export interface CycladesState {
   cyclopsSwap: CyclopsSwapState | null;
   /** Игрок обязан разместить Метрополию (сработал триггер 4 философа / 4 здания) или null. */
   metropolisPlace: MetropolisPlaceState | null;
+  /** Итог последнего завершённого боя (для модалки результата) или null. */
+  lastCombat?: CombatReport | null;
+  /**
+   * Кто держал 2+ Метрополии на конце прошлого цикла. Победа засчитывается,
+   * только если Метрополии устояли ещё один полный цикл.
+   */
+  metroHolders?: PlayerID[];
+  /** Победитель партии (ставится на стыке циклов) или null. */
+  winner?: PlayerID | null;
   log: LogEntry[];
 }
 

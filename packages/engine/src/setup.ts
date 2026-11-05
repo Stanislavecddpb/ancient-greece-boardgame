@@ -122,6 +122,9 @@ export function setupGame(ctx: Ctx, random?: RandomAPI): CycladesState {
     satyrSteal: null,
     cyclopsSwap: null,
     metropolisPlace: null,
+    lastCombat: null,
+    metroHolders: [],
+    winner: null,
     log: [{ cycle: 1, text: 'Партия началась. Боги ждут подношений.' }],
   };
 }

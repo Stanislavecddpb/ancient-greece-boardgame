@@ -411,6 +411,14 @@ function finishCombat(G: CycladesState, result: 'attacker' | 'defender' | 'retre
   const c = G.combat;
   if (!c) return;
   const loc = G.territories[c.location];
+  // Итог боя — для модалки результата у всех игроков.
+  G.lastCombat = {
+    id: (G.lastCombat?.id ?? 0) + 1,
+    kind: c.kind, location: c.location, attackerId: c.attackerId, defenderId: c.defenderId, result,
+    startAttacker: c.startAttacker ?? c.attackerUnits, startDefender: c.startDefender ?? c.defenderUnits,
+    attackerLeft: c.attackerUnits, defenderLeft: c.defenderUnits, defenderBonus: c.defenderBonus,
+    history: [...(c.history ?? [])],
+  };
 
   if (c.kind === 'naval' && isSea(loc)) {
     if (result === 'attacker') {
@@ -445,7 +453,9 @@ export function applyCombatRound(G: CycladesState, pid: PlayerID, roll: DieRoll)
   if (!c) return 'нет боя';
   if (c.attackerId !== pid) return 'не ваш бой';
   const before = { attacker: c.attackerUnits, defender: c.defenderUnits };
+  if (c.round === 0) { c.startAttacker = c.attackerUnits; c.startDefender = c.defenderUnits; }
   oneRound(c, roll);
+  c.history = [...(c.history ?? []), { ...c.lastRoll! }];
   // Погибшие не пропадают навсегда: фигурки возвращаются владельцам в запас.
   const supply = c.kind === 'naval' ? 'fleetsSupply' : 'troopsSupply';
   const attacker = G.players[c.attackerId];
@@ -466,6 +476,13 @@ export function applyCombatRound(G: CycladesState, pid: PlayerID, roll: DieRoll)
     finishCombat(G, 'defender');
   }
   return null;
+}
+
+/** Ручной режим: прервать бой — выжившие атакующие возвращаются, итог не показываем. */
+export function cancelCombat(G: CycladesState): void {
+  if (!G.combat) return;
+  finishCombat(G, 'retreat');
+  if (G.lastCombat) G.lastCombat.result = 'cancelled';
 }
 
 /** Отступление атакующего: выжившие возвращаются на исходную клетку. */

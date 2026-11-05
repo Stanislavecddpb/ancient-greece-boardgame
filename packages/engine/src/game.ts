@@ -1,7 +1,6 @@
 import type { Game, Ctx } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 import type { CycladesState, TerritoryId, GodName } from './types';
-import { METROPOLIS_TO_WIN } from './types';
 import { setupGame, applySetColor, applyShuffleColors } from './setup';
 import { applyIncome } from './income';
 import {
@@ -22,7 +21,8 @@ import {
   advanceTurn,
   endCycle,
 } from './actions';
-import { metropolisCount, islandsOf, log } from './helpers';
+import { islandsOf, log } from './helpers';
+import { applyManualEdit, type ManualOp } from './manual';
 import { applyPlaceMetropolis } from './metropolis';
 import { applyBuyCreature, applyCycleCreatures, expireBoardCreatures, applySellUnits, applyChimeraReplay, endChimera, applySatyrSteal, endSatyr, applyCyclopsReplace, endCyclops, applyKrakenStep, endKraken } from './creatures';
 import { startFleetMove, hopFleet, endFleetMove, applyTroopMove, applyCombatRound, applyCombatRetreat, applySylphStep, endSylph, applyPushFleet, endPolyphemus, applyPegasusMove, endPegasus } from './movement';
@@ -37,6 +37,15 @@ function posOf(ctx: Ctx, pid: string | null | undefined): number {
   const i = ctx.playOrder.indexOf(pid);
   return i >= 0 ? i : ctx.playOrderPos;
 }
+
+/**
+ * Ручной режим — правка состояния любым игроком в любой момент партии (чинить
+ * баги). Чтобы ход принимался не только от текущего игрока, в аукционе и фазе
+ * действий активны все игроки; остальные ходы сами проверяют, чья очередь.
+ */
+const manualEdit = ({ G, playerID }: { G: CycladesState; playerID?: string | null }, op: ManualOp) => {
+  if (!playerID || applyManualEdit(G, playerID, op)) return INVALID_MOVE;
+};
 
 /** Идёт ли незавершённый эффект существа (выбор цели, движение, распродажа...). */
 function creatureModePending(G: CycladesState): boolean {
@@ -102,6 +111,7 @@ export const CycladesGame: Game<CycladesState> = {
         G.auction = null;
       },
       turn: {
+        activePlayers: { all: 'default' },
         order: {
           first: ({ G, ctx }) => posOf(ctx, G.auction?.toAct),
           next: ({ G, ctx }) => posOf(ctx, G.auction?.toAct),
@@ -113,6 +123,8 @@ export const CycladesGame: Game<CycladesState> = {
           if (applyBid(G, ctx, playerID!, god, amount)) return INVALID_MOVE;
           if (!auctionComplete(G, ctx)) events.endTurn();
         },
+
+        manualEdit,
 
         // Уйти под покровительство Аполлона (бесплатно, без вытеснения).
         chooseApollo: ({ G, ctx, playerID, events }) => {
@@ -134,6 +146,7 @@ export const CycladesGame: Game<CycladesState> = {
       },
       endIf: ({ G }) => G.actions === null,
       turn: {
+        activePlayers: { all: 'default' },
         // В начале активации игрока снимаем его фигуры существ, поставленные в прошлый цикл.
         onBegin: ({ G }) => {
           const pid = G.pendingCornucopia ?? activePlayerId(G);
@@ -146,6 +159,8 @@ export const CycladesGame: Game<CycladesState> = {
         },
       },
       moves: {
+        manualEdit,
+
         recruit: ({ G, playerID }, targetId?: TerritoryId) => {
           const turn = currentTurn(G);
           if (G.combat || G.fleetMove || !turn || turn.playerId !== playerID) return INVALID_MOVE;
@@ -309,19 +324,13 @@ export const CycladesGame: Game<CycladesState> = {
     },
   },
 
-  // Победа: 2 Метрополии, проверяется на стыке циклов (когда фаза действий не идёт).
+  // Победа ставится на стыке циклов (checkVictory в endCycle): две Метрополии
+  // должны устоять ещё один полный цикл. Плюс — остался один невыбывший игрок.
   endIf: ({ G, ctx }) => {
+    if (G.winner) return { winner: G.winner };
     if (G.actions !== null) return;
-    // Остался один невыбывший игрок — он победил.
     const alive = ctx.playOrder.filter((pid) => !G.players[pid].isEliminated);
     if (ctx.numPlayers > 1 && alive.length === 1) return { winner: alive[0] };
-    const contenders = ctx.playOrder
-      .filter((pid) => !G.players[pid].isEliminated)
-      .map((pid) => ({ pid, metro: metropolisCount(G, pid), gold: G.players[pid].gold }))
-      .filter((c) => c.metro >= METROPOLIS_TO_WIN);
-    if (contenders.length === 0) return;
-    contenders.sort((a, b) => b.metro - a.metro || b.gold - a.gold);
-    return { winner: contenders[0].pid };
   },
 };
 

@@ -34,6 +34,7 @@ import type { CreatureDef, Territory } from '@cyclades/engine';
 import { BoardMap } from './BoardMap';
 import type { MovementCtx } from './BoardMap';
 import { GodBoard } from './GodBoard';
+import { CombatModal, CombatResultModal, VictoryBanner, ManualPanel } from './Overlays';
 import { GreekPage, COLOR_NAMES } from './GreekPage';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
@@ -78,6 +79,9 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
   const [troopCount, setTroopCount] = useState(1);
   const [fleetTake, setFleetTake] = useState(99);
   const [intro, setIntro] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  // Итоги боёв, случившихся до открытия страницы, повторно не показываем.
+  const [seenCombat, setSeenCombat] = useState(G.lastCombat?.id ?? 0);
 
   // Имя игрока: введённое при входе (matchData) → иначе из состояния.
   const nameOf = (pid: string | null): string => {
@@ -162,9 +166,7 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
         <MarketColumn G={G} me={me} />
         <div className="phase-tag">Цикл {G.cycle} · {phaseLabel(ctx.phase)}</div>
         {intro && <GameIntro G={G} order={order} nameOf={nameOf} onDone={() => setIntro(false)} />}
-        {G.combat ? (
-          <CombatPanel G={G} me={me} moves={moves} />
-        ) : G.metropolisPlace && G.metropolisPlace.playerId === me ? (
+        {G.combat ? null : G.metropolisPlace && G.metropolisPlace.playerId === me ? (
           <MetropolisPanel G={G} me={me} moves={moves} selected={selected} />
         ) : G.fleetMove && G.fleetMove.playerId === me ? (
           <FleetMovePanel G={G} moves={moves} take={fleetTake} setTake={setFleetTake} />
@@ -196,6 +198,18 @@ function GameView({ G, ctx, moves, me, matchData, matchID }: {
             troopCount={troopCount} setTroopCount={setTroopCount} hasMove={!!movement} />
         ) : null}
         <EventLog G={G} />
+        <VictoryBanner G={G} nameOf={nameOf} />
+        {G.combat && <CombatModal G={G} me={me} moves={moves} nameOf={nameOf} />}
+        {!G.combat && G.lastCombat && G.lastCombat.id > seenCombat && G.lastCombat.result !== 'cancelled' && (
+          <CombatResultModal report={G.lastCombat} G={G} nameOf={nameOf} onClose={() => setSeenCombat(G.lastCombat!.id)} />
+        )}
+        <button className={`manual-toggle ${manualOpen ? 'on' : ''}`} aria-pressed={manualOpen}
+          onClick={() => setManualOpen((o) => !o)} title="Ручной режим: поправить фишки, золото, отменить эффекты">
+          ✋ Ручной режим
+        </button>
+        {manualOpen && (
+          <ManualPanel G={G} ctx={ctx} me={me} moves={moves} selected={selected} nameOf={nameOf} onClose={() => setManualOpen(false)} />
+        )}
       </div>
       <GodBoard G={G} ctx={ctx} me={me} moves={moves} nameOf={nameOf} />
     </div>
@@ -519,65 +533,6 @@ function GameIntro({ G, order, nameOf, onDone }: {
         </motion.button>
       </motion.div>
     </div>
-  );
-}
-
-function CombatPanel({ G, me, moves }: { G: CycladesState; me: string | null; moves: any }) {
-  const c = G.combat!;
-  const loc = G.territories[c.location];
-  const attacker = G.players[c.attackerId];
-  const defender = G.players[c.defenderId];
-  const unit = c.kind === 'naval' ? '⛵' : '⚔️';
-  const myFight = c.attackerId === me;
-  const last = c.lastRoll;
-  return (
-    <div className="action-bar combat">
-      <div className="ab-title">⚔️ Бой за {loc?.name} · раунд {c.round}</div>
-      <div className="ab-controls">
-        <span className="combat-side" style={{ color: attacker.color }}>
-          {attacker.name}: {unit}×{c.attackerUnits}
-        </span>
-        <span className="combat-vs">против</span>
-        <span className="combat-side" style={{ color: defender.color }}>
-          {defender.name}: {unit}×{c.defenderUnits}{c.defenderBonus > 0 ? ` (+${c.defenderBonus}🛡)` : ''}
-        </span>
-        {last && (
-          <span className="combat-roll">
-            <CombatDie key={`a${c.round}`} value={last.aDie} color={attacker.color} lost={last.aLost} />
-            <CombatDie key={`d${c.round}`} value={last.dDie} color={defender.color} lost={last.dLost} bonus={c.defenderBonus} />
-            <span className="combat-outcome">
-              {last.aLost && last.dLost ? 'обоюдные потери' : last.dLost ? 'защитник теряет юнита' : last.aLost ? 'атакующий теряет юнита' : 'без потерь'}
-            </span>
-          </span>
-        )}
-        {myFight ? (
-          <>
-            <button onClick={() => moves.combatRound()}>🎲 Раунд</button>
-            <button className="end-turn" onClick={() => moves.combatRetreat()}>🏳️ Отступить</button>
-          </>
-        ) : (
-          <span className="sel-hint">ход атакующего…</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Анимированный кубик боя: «крутится» при появлении и замирает на выпавшей грани. */
-function CombatDie({ value, color, lost, bonus }: {
-  value: number; color: string; lost: boolean; bonus?: number;
-}) {
-  return (
-    <motion.span
-      className={`combat-die ${lost ? 'die-lost' : ''}`}
-      style={{ ['--die' as any]: color }}
-      initial={{ rotate: -240, scale: 0.3, opacity: 0 }}
-      animate={{ rotate: [-240, 30, 0], scale: [0.3, 1.15, 1], opacity: 1 }}
-      transition={{ duration: 0.55, ease: 'easeOut', times: [0, 0.7, 1] }}
-    >
-      <span className="die-face">{value}</span>
-      {bonus ? <span className="die-bonus">+{bonus}🛡</span> : null}
-    </motion.span>
   );
 }
 

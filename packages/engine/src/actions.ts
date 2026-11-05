@@ -7,9 +7,10 @@ import {
   GOD_BUILDING,
   MAX_RECRUIT_PER_TURN,
   BUILDING_COST,
+  METROPOLIS_TO_WIN,
 } from './types';
 import { isIsland, isSea } from './board';
-import { islandsOf, freeSlots, log } from './helpers';
+import { islandsOf, freeSlots, log, metropolisCount } from './helpers';
 import { checkMetropolis } from './metropolis';
 import { advanceCreatureMarket, cleanupBoardCreatures } from './creatures';
 import { seaBlockedForFleet } from './movement';
@@ -192,6 +193,31 @@ export function advanceTurn(G: CycladesState): boolean {
   return false;
 }
 
+/**
+ * Победа на стыке циклов. Две Метрополии должны устоять ещё один полный цикл:
+ * побеждает тот, у кого их 2+ и на конце этого цикла, и на конце прошлого.
+ * Несколько таких — больше Метрополий, при равенстве больше золота.
+ */
+export function checkVictory(G: CycladesState, ctx: Ctx): void {
+  const alive = ctx.playOrder.filter((pid) => !G.players[pid].isEliminated);
+  const holders = alive.filter((pid) => metropolisCount(G, pid) >= METROPOLIS_TO_WIN);
+  const prev = G.metroHolders ?? [];
+  const confirmed = holders.filter((pid) => prev.includes(pid));
+  if (confirmed.length > 0) {
+    confirmed.sort((a, b) => metropolisCount(G, b) - metropolisCount(G, a) || G.players[b].gold - G.players[a].gold);
+    G.winner = confirmed[0];
+    log(G, `${G.players[G.winner].name} удержал Метрополии целый цикл — победа!`);
+  } else {
+    for (const pid of holders) {
+      log(G, `${G.players[pid].name} владеет двумя Метрополиями. Если они устоят до конца следующего цикла — победа.`);
+    }
+    for (const pid of prev) {
+      if (!holders.includes(pid)) log(G, `${G.players[pid].name} лишился второй Метрополии — победа ускользнула.`);
+    }
+  }
+  G.metroHolders = holders;
+}
+
 /** Бухгалтерия конца цикла: чистка пустого флота, ротация стартового игрока, новый цикл. */
 export function endCycle(G: CycladesState, ctx: Ctx): void {
   // Удаляем «осиротевший» признак владельца у пустых морей.
@@ -213,6 +239,8 @@ export function endCycle(G: CycladesState, ctx: Ctx): void {
   }
   // Рынок существ сдвигается на одну позицию в конце раунда.
   advanceCreatureMarket(G.creatures);
+
+  checkVictory(G, ctx);
 
   G.startIndex = (G.startIndex + 1) % ctx.playOrder.length;
   G.cycle += 1;
