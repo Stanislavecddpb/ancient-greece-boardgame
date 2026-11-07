@@ -40,8 +40,7 @@ export function recruitCost(god: GodName, recruited: number): number {
 
 /**
  * Собирает очередь исполнения из результатов аукциона и запускает фазу действий.
- * Порядок очереди = порядок слотов аукциона (канонический для 2/3/4 игроков,
- * случайный для 5 — задаётся при setupAuction).
+ * Порядок очереди = порядок слотов аукциона (случайный каждый цикл — задаётся при setupAuction).
  */
 export function startActionsPhase(G: CycladesState): void {
   const a = G.auction;

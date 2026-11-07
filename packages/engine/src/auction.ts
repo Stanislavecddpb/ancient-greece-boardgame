@@ -39,8 +39,8 @@ export function drawGods(
  *
  *  • 5 игроков: открываются все 4 конкурентных бога, но в случайном порядке
  *    каждый цикл — порядок слотов задаёт порядок активации в фазе действий.
- *  • иначе: numPlayers − 1 конкурентных богов с ротацией по циклам, в
- *    каноническом порядке (Арес → Посейдон → Зевс → Афина).
+ *  • иначе: numPlayers − 1 конкурентных богов с ротацией по циклам, тоже в случайном
+ *    порядке — иначе Арес, когда он есть, всегда ходил бы первым.
  */
 export function godsForCycle(
   numPlayers: number,
@@ -61,8 +61,9 @@ export function godsForCycle(
   for (let i = 0; i < count; i++) {
     chosen.add(COMPETITIVE_GODS[(start + i) % COMPETITIVE_GODS.length]);
   }
-  // Сохраняем канонический порядок исполнения.
-  return COMPETITIVE_GODS.filter((g) => chosen.has(g));
+  // Порядок слотов = порядок ходов, поэтому тасуем. Без shuffle (тесты) — канонический.
+  const gods = COMPETITIVE_GODS.filter((g) => chosen.has(g));
+  return shuffle ? shuffle(gods) : gods;
 }
 
 /** Сколько игрок реально заплатит за ставку с учётом жрецов (минимум 1). */

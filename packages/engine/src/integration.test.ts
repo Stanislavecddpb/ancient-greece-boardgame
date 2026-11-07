@@ -4,8 +4,8 @@ import { CycladesGame } from './game';
 import type { CycladesState } from './types';
 
 /** Запускает локального клиента (singleplayer) и возвращает его. */
-function makeClient(numPlayers = 2) {
-  const client = Client<CycladesState>({ game: CycladesGame, numPlayers });
+function makeClient(numPlayers = 2, seed?: string) {
+  const client = Client<CycladesState>({ game: seed ? { ...CycladesGame, seed } : CycladesGame, numPlayers });
   client.start();
   return client;
 }
@@ -70,8 +70,10 @@ describe('интеграция фаз через boardgame.io', () => {
     let s = client.getState()!;
     expect(s.ctx.phase).toBe('actions');
     const order = s.G.actions!.queue.map((t) => `${t.god}:${t.playerId}`);
-    // Сверху вниз: Арес('1'), Посейдон('3'), Зевс('0'). Аполлон('2') — вне очереди.
-    expect(order).toEqual(['ares:1', 'poseidon:3', 'zeus:0']);
+    // Каждый бог — у того, кто его подкупил; порядок — сверху вниз по слотам (он случайный). Аполлон('2') — вне очереди.
+    const owner: Record<string, string> = { zeus: '0', ares: '1', poseidon: '3' };
+    expect(order.map((o) => o.split(':')[0]).sort()).toEqual(['ares', 'poseidon', 'zeus']);
+    for (const o of order) expect(o).toBe(`${o.split(':')[0]}:${owner[o.split(':')[0]]}`);
     // Сначала «апполонец» '2' ставит рог изобилия.
     expect(s.G.pendingCornucopia).toBe('2');
     expect(s.ctx.currentPlayer).toBe('2');
@@ -79,7 +81,17 @@ describe('интеграция фаз через boardgame.io', () => {
 
     s = client.getState()!;
     expect(s.G.pendingCornucopia).toBeNull();
-    expect(s.ctx.currentPlayer).toBe('1'); // первым из богов ходит подкупивший верхнего бога
+    expect(s.ctx.currentPlayer).toBe(order[0].split(':')[1]); // первым из богов ходит подкупивший верхнего бога
+  });
+
+  it('4 игрока: какой бог ходит первым, решает жребий, а не всегда Арес', () => {
+    const firsts = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      const client = makeClient(4, `god-order-${i}`);
+      startGame(client);
+      firsts.add(client.getState()!.G.auction!.slots[0].god);
+    }
+    expect(firsts.size).toBeGreaterThan(1);
   });
 
   it('победитель аукциона исполняет действия и завершает свой ход', () => {
@@ -130,6 +142,11 @@ describe('интеграция фаз через boardgame.io', () => {
     let s = client.getState()!;
     client.moves.placeCornucopia(islandOf(s.G, '2'));
     s = client.getState()!;
+    // Порядок богов случайный: пропускаем тех, кто ходит раньше Ареса.
+    while (s.G.actions!.queue[s.G.actions!.index].god !== 'ares') {
+      client.moves.endGod();
+      s = client.getState()!;
+    }
     expect(s.ctx.currentPlayer).toBe('1'); // Арес
 
     // Свободные слоты Ареса по всем его островам — строим, пока хватает золота и места.

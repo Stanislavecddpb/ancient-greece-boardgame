@@ -149,6 +149,15 @@ describe('боги на 3 игрока — по 2 из мешка', () => {
     expect(G.auction!.slots.map((s) => s.god)).toEqual(['ares', 'poseidon', 'zeus']);
     expect(G.godBag).toEqual([]);
   });
+
+  it('у 4 игроков порядок богов (= порядок ходов) случайный, а не всегда с Ареса', () => {
+    const reverse = <T,>(a: T[]) => [...a].reverse();
+    expect(godsForCycle(4, 1, reverse)).toEqual(['zeus', 'poseidon', 'ares']);
+    const ctx = ctxFor(4);
+    const G = setupGame(ctx);
+    setupAuction(G, ctx, { Shuffle: reverse });
+    expect(G.auction!.slots.map((s) => s.god)).toEqual(['zeus', 'poseidon', 'ares']);
+  });
 });
 
 describe('режим на 2 игрока (та же малая карта)', () => {
