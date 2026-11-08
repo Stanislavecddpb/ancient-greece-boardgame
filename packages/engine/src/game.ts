@@ -21,7 +21,7 @@ import {
   advanceTurn,
   endCycle,
 } from './actions';
-import { islandsOf, log } from './helpers';
+import { finalRanking, islandsOf, log } from './helpers';
 import { applyManualEdit, type ManualOp } from './manual';
 import { applyPlaceMetropolis } from './metropolis';
 import { applyBuyCreature, applyCycleCreatures, expireBoardCreatures, applySellUnits, applyChimeraReplay, endChimera, applySatyrSteal, endSatyr, applyCyclopsReplace, endCyclops, applyKrakenStep, endKraken } from './creatures';
@@ -327,10 +327,11 @@ export const CycladesGame: Game<CycladesState> = {
   // Победа ставится на стыке циклов (checkVictory в endCycle): две Метрополии
   // должны устоять ещё один полный цикл. Плюс — остался один невыбывший игрок.
   endIf: ({ G, ctx }) => {
-    if (G.winner) return { winner: G.winner };
+    // ranking — порядок мест для рейтинга платформы.
+    if (G.winner) return { winner: G.winner, ranking: finalRanking(G, ctx.playOrder, G.winner) };
     if (G.actions !== null) return;
     const alive = ctx.playOrder.filter((pid) => !G.players[pid].isEliminated);
-    if (ctx.numPlayers > 1 && alive.length === 1) return { winner: alive[0] };
+    if (ctx.numPlayers > 1 && alive.length === 1) return { winner: alive[0], ranking: [alive[0]] };
   },
 };
 

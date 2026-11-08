@@ -319,7 +319,11 @@ describe('победа', () => {
     expect((CycladesGame.endIf as any)({ G, ctx })).toBeUndefined();
     endCycle(G, ctx); // устояли целый цикл — победа
     expect(G.winner).toBe('0');
-    expect((CycladesGame.endIf as any)({ G, ctx })).toEqual({ winner: '0' });
+    const over = (CycladesGame.endIf as any)({ G, ctx });
+    expect(over.winner).toBe('0');
+    // Полный порядок мест для рейтинга: победитель первым, все невыбывшие по разу.
+    expect(over.ranking[0]).toBe('0');
+    expect([...over.ranking].sort()).toEqual(ctx.playOrder.filter((pid: string) => !G.players[pid].isEliminated).sort());
   });
 
   it('если Метрополию отобрали за этот цикл — победы нет, отсчёт сначала', () => {

@@ -19,6 +19,23 @@ export function metropolisCount(G: CycladesState, pid: PlayerID): number {
   return islandsOf(G, pid).filter((i) => i.hasMetropolis).length;
 }
 
+/**
+ * Порядок мест по итогу партии: победитель первым, затем невыбывшие по числу
+ * Метрополий, островов и золоту. Выбывшие в порядок не входят — платформа
+ * ставит их на одно последнее место.
+ */
+export function finalRanking(G: CycladesState, playOrder: PlayerID[], winner: PlayerID): PlayerID[] {
+  const rest = playOrder
+    .filter((pid) => pid !== winner && !G.players[pid].isEliminated)
+    .sort(
+      (a, b) =>
+        metropolisCount(G, b) - metropolisCount(G, a) ||
+        islandsOf(G, b).length - islandsOf(G, a).length ||
+        G.players[b].gold - G.players[a].gold,
+    );
+  return [winner, ...rest];
+}
+
 /** Типы зданий, которые есть у игрока (по всем его островам). */
 export function buildingTypesOwned(G: CycladesState, pid: PlayerID): Set<BuildingType> {
   const types = new Set<BuildingType>();
