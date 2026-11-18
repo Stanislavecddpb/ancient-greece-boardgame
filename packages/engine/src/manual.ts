@@ -3,6 +3,8 @@ import {
   type PlayerID,
   type TerritoryId,
   UNIT_SUPPLY,
+  ALL_BUILDINGS,
+  type BuildingType,
 } from './types';
 import { isIsland, isSea } from './board';
 import { freeSlots, metropolisSlotCost, log } from './helpers';
@@ -20,7 +22,12 @@ export type ManualOp =
   | { kind: 'metropolis'; territory: TerritoryId }
   | { kind: 'removeFigure'; territory: TerritoryId }
   | { kind: 'resource'; player: PlayerID; field: 'gold' | 'priests' | 'philosophers'; delta: number }
+  | { kind: 'building'; territory: TerritoryId; building: BuildingType; delta: 1 | -1 }
   | { kind: 'cancelEffects' };
+
+const BUILDING_LABEL: Record<BuildingType, string> = {
+  port: 'Порт', fortress: 'Крепость', temple: 'Храм', university: 'Университет',
+};
 
 const RESOURCE_LABEL = { gold: 'золото', priests: 'жрецы', philosophers: 'философы' } as const;
 
@@ -125,9 +132,30 @@ export function applyManualEdit(G: CycladesState, actor: PlayerID, op: ManualOp)
       return null;
     }
 
+    case 'building': {
+      const isl = G.territories[op.territory];
+      if (!isl || !isIsland(isl)) return 'нужен остров';
+      if (!ALL_BUILDINGS.includes(op.building)) return 'неизвестное здание';
+      const label = BUILDING_LABEL[op.building];
+      if (op.delta > 0) {
+        if (!isl.ownerId) return 'у острова нет владельца';
+        if (freeSlots(isl) <= 0) return 'на острове нет свободного места';
+        isl.buildings.push({ type: op.building, ownerId: isl.ownerId });
+        note(`построен ${label} на ${isl.name}`);
+      } else {
+        const i = isl.buildings.findIndex((b) => b.type === op.building);
+        if (i < 0) return 'такого здания на острове нет';
+        isl.buildings.splice(i, 1);
+        note(`снят ${label} на ${isl.name}`);
+      }
+      return null;
+    }
+
     case 'resource': {
       const p = G.players[op.player];
       if (!p) return 'нет такого игрока';
+      // Ресурсы (особенно золото за ширмой) — только свои.
+      if (op.player !== actor) return 'можно менять только свои ресурсы';
       const delta = Math.trunc(Number(op.delta) || 0);
       if (!delta) return 'нечего менять';
       const before = p[op.field];

@@ -44,7 +44,8 @@ describe('ручной режим', () => {
   it('золото не уходит в минус; эффекты существ отменяются', () => {
     const G = setupGame(ctxFor(4));
     G.players['2'].gold = 1;
-    expect(applyManualEdit(G, '0', { kind: 'resource', player: '2', field: 'gold', delta: -5 })).toBeNull();
+    expect(applyManualEdit(G, '0', { kind: 'resource', player: '2', field: 'gold', delta: -5 })).toBe('можно менять только свои ресурсы');
+    expect(applyManualEdit(G, '2', { kind: 'resource', player: '2', field: 'gold', delta: -5 })).toBeNull();
     expect(G.players['2'].gold).toBe(0);
     expect(applyManualEdit(G, '0', { kind: 'cancelEffects' })).toBe('нет активных эффектов');
     G.pegasusMove = '1';
@@ -65,6 +66,24 @@ describe('ручной режим', () => {
     const gold0 = client.getState()!.G.players[other].gold;
     client.moves.manualEdit({ kind: 'resource', player: other, field: 'gold', delta: 3 });
     expect(client.getState()!.G.players[other].gold).toBe(gold0 + 3);
+  });
+});
+
+describe('ручной режим: постройки', () => {
+  it('добавить и снять здание, с учётом свободных мест', () => {
+    const G = setupGame(ctxFor(4));
+    const isl = ownIsland(G, '1');
+    isl.buildings = [];
+    isl.hasMetropolis = false;
+    expect(applyManualEdit(G, '0', { kind: 'building', territory: isl.id, building: 'temple', delta: 1 })).toBeNull();
+    expect(isl.buildings).toEqual([{ type: 'temple', ownerId: '1' }]);
+    expect(applyManualEdit(G, '0', { kind: 'building', territory: isl.id, building: 'port', delta: -1 })).toBe('такого здания на острове нет');
+    expect(applyManualEdit(G, '0', { kind: 'building', territory: isl.id, building: 'temple', delta: -1 })).toBeNull();
+    expect(isl.buildings).toEqual([]);
+    for (let i = 0; i < isl.buildSlots; i++) {
+      expect(applyManualEdit(G, '0', { kind: 'building', territory: isl.id, building: 'port', delta: 1 })).toBeNull();
+    }
+    expect(applyManualEdit(G, '0', { kind: 'building', territory: isl.id, building: 'port', delta: 1 })).toBe('на острове нет свободного места');
   });
 });
 

@@ -7,6 +7,8 @@ import {
   type PlayerID,
   type TerritoryId,
   COMBAT_DIE,
+  ALL_BUILDINGS,
+  freeSlots,
   isIsland,
   isSea,
 } from '@cyclades/engine';
@@ -242,6 +244,10 @@ export function VictoryBanner({ G, nameOf }: { G: CycladesState; nameOf: (pid: s
 
 // ===================== Ручной режим =====================
 
+const MP_BUILDING_LABEL: Record<string, string> = {
+  port: 'Порт', fortress: 'Крепость', temple: 'Храм', university: 'Университет',
+};
+
 export function ManualPanel({ G, ctx, me, moves, selected, nameOf, onClose }: {
   G: CycladesState; ctx: any; me: string | null; moves: any; selected: TerritoryId | null;
   nameOf: (pid: string) => string; onClose: () => void;
@@ -292,6 +298,21 @@ export function ManualPanel({ G, ctx, me, moves, selected, nameOf, onClose }: {
                 {players.map((pid) => <option key={pid} value={pid}>{nameOf(pid)}</option>)}
               </select>
             </div>
+            <div className="mp-label">Постройки (свободно мест: {freeSlots(sel)} из {sel.buildSlots})</div>
+            {ALL_BUILDINGS.map((b) => {
+              const n = sel.buildings.filter((x) => x.type === b).length;
+              return (
+                <div className="mp-row" key={b}>
+                  <span>{MP_BUILDING_LABEL[b]}</span>
+                  <button className="sub-done" aria-label={`Снять: ${MP_BUILDING_LABEL[b]}`} disabled={n <= 0}
+                    onClick={() => edit({ kind: 'building', territory: sel.id, building: b, delta: -1 })}>−</button>
+                  <b className="mp-num">{n}</b>
+                  <button className="sub-done" aria-label={`Построить: ${MP_BUILDING_LABEL[b]}`}
+                    disabled={!sel.ownerId || freeSlots(sel) <= 0}
+                    onClick={() => edit({ kind: 'building', territory: sel.id, building: b, delta: 1 })}>+</button>
+                </div>
+              );
+            })}
             <div className="mp-row">
               <span>Метрополия</span>
               <button className="sub-done" onClick={() => edit({ kind: 'metropolis', territory: sel.id })}>
@@ -316,34 +337,21 @@ export function ManualPanel({ G, ctx, me, moves, selected, nameOf, onClose }: {
         )}
       </div>
 
-      <div className="mp-section">
-        <div className="mp-label">Ресурсы игроков</div>
-        <table className="mp-table">
-          <thead><tr><th></th><th>🪙</th><th>⚜️</th><th>📜</th></tr></thead>
-          <tbody>
-            {players.map((pid) => {
-              const p = G.players[pid];
-              const cell = (field: 'gold' | 'priests' | 'philosophers') => (
-                <td>
-                  <span className="mp-step">
-                    <button className="sub-done" aria-label={`Уменьшить у ${nameOf(pid)}`} disabled={p[field] <= 0}
-                      onClick={() => edit({ kind: 'resource', player: pid, field, delta: -1 })}>−</button>
-                    <b>{p[field]}</b>
-                    <button className="sub-done" aria-label={`Увеличить у ${nameOf(pid)}`}
-                      onClick={() => edit({ kind: 'resource', player: pid, field, delta: 1 })}>+</button>
-                  </span>
-                </td>
-              );
-              return (
-                <tr key={pid}>
-                  <th style={{ color: p.color }}>{nameOf(pid)}</th>
-                  {cell('gold')}{cell('priests')}{cell('philosophers')}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {me && G.players[me] && (
+        <div className="mp-section">
+          <div className="mp-label">Мои ресурсы</div>
+          {([['gold', '🪙 Золото'], ['priests', '⚜️ Жрецы'], ['philosophers', '📜 Философы']] as const).map(([field, label]) => (
+            <div className="mp-row" key={field}>
+              <span>{label}</span>
+              <button className="sub-done" aria-label={`Уменьшить: ${label}`} disabled={G.players[me][field] <= 0}
+                onClick={() => edit({ kind: 'resource', player: me, field, delta: -1 })}>−</button>
+              <b className="mp-num">{G.players[me][field]}</b>
+              <button className="sub-done" aria-label={`Увеличить: ${label}`}
+                onClick={() => edit({ kind: 'resource', player: me, field, delta: 1 })}>+</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <button className="end-turn mp-cancel" disabled={!effects} onClick={() => edit({ kind: 'cancelEffects' })}>
         Отменить бой и эффекты существ
